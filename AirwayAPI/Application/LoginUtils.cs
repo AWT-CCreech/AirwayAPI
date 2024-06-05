@@ -7,7 +7,8 @@ namespace AirwayAPI.Application
 {
     public static class LoginUtils
     {
-        private static string EncryptionKey = "ASDASWEF453123234";
+        private static readonly string EncryptionKey = "ASDASWEF453123234";
+
         public static string encryptPassword(string password)
         {
             byte[] clearBytes = Encoding.Unicode.GetBytes(password);
@@ -29,6 +30,12 @@ namespace AirwayAPI.Application
 
         public static string decryptPassword(string password)
         {
+            // Validate if the input string is a valid Base-64 string
+            if (!IsBase64String(password))
+            {
+                throw new ArgumentException("Invalid Base-64 string");
+            }
+
             byte[] cipherBytes = Convert.FromBase64String(password);
             using (Aes encryptor = Aes.Create())
             {
@@ -44,6 +51,12 @@ namespace AirwayAPI.Application
                 password = Encoding.Unicode.GetString(ms.ToArray());
             }
             return password;
+        }
+
+        private static bool IsBase64String(string base64)
+        {
+            Span<byte> buffer = new(new byte[base64.Length]);
+            return Convert.TryFromBase64String(base64, buffer, out _);
         }
     }
 }
