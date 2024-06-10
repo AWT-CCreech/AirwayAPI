@@ -1,15 +1,11 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AirwayAPI.Application;
+using AirwayAPI.Models;
+using AirwayAPI.Models.DropShipModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
-using AirwayAPI.Application;
-using AirwayAPI.Data;
-using AirwayAPI.Models;
-using AirwayAPI.Models.DropShipModels;
 
 namespace AirwayAPI.Controllers.DropShipControllers
 {

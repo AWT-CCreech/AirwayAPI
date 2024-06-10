@@ -1,10 +1,13 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class CsQtSoToInvNo
 {
     public int RowId { get; set; }
 
-    public int InvoiceNo { get; set; }
+    public int? InvoiceNo { get; set; }
 
     public int? SalesOrderNo { get; set; }
 

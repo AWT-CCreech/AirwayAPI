@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class RequestPo
 {
@@ -6,7 +9,7 @@ public partial class RequestPo
 
     public int? RequestId { get; set; }
 
-    public string Ponum { get; set; }
+    public string? Ponum { get; set; }
 
     public DateTime? DeliveryDate { get; set; }
 

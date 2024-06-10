@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class CamContact
 {
@@ -10,7 +13,7 @@ public partial class CamContact
 
     public string? GmaccountNum { get; set; }
 
-    public string Company { get; set; }
+    public string? Company { get; set; }
 
     public string? Contact { get; set; }
 

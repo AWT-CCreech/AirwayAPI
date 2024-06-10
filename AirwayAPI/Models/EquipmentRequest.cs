@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class EquipmentRequest
 {
@@ -6,11 +9,11 @@ public partial class EquipmentRequest
 
     public int? EventId { get; set; }
 
-    public string PartDesc { get; set; }
+    public string? PartDesc { get; set; }
 
-    public string PartNum { get; set; }
+    public string? PartNum { get; set; }
 
-    public string AltPartNum { get; set; }
+    public string? AltPartNum { get; set; }
 
     public double? Quantity { get; set; }
 
@@ -50,7 +53,7 @@ public partial class EquipmentRequest
 
     public int? AllPossBy { get; set; }
 
-    public string SalesOrderNum { get; set; }
+    public string? SalesOrderNum { get; set; }
 
     public double? SalePrice { get; set; }
 
@@ -138,10 +141,6 @@ public partial class EquipmentRequest
     public bool? DropShipment { get; set; }
 
     public byte? Porequired { get; set; }
-
-    public int? NeedToBuy { get; set; }
-
-    public DateTime? NeedToBuyTs { get; set; }
 
     public bool? SoldWborder { get; set; }
 }

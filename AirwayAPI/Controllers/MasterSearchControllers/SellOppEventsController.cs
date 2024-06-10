@@ -1,4 +1,4 @@
-﻿using AirwayAPI.Data;
+﻿using AirwayAPI.Models;
 using AirwayAPI.Models.MasterSearch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

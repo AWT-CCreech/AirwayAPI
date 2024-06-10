@@ -1,10 +1,5 @@
-﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
+﻿using AirwayAPI.Models;
 using AirwayAPI.Models.MasterSearch;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Controllers.MasterSearch
 {

@@ -1,9 +1,7 @@
-﻿using AirwayAPI.Data;
+﻿using AirwayAPI.Models;
 using AirwayAPI.Models.MasterSearch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Controllers.MasterSearch
 {

@@ -1,7 +1,6 @@
-﻿using AirwayAPI.Models;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Data;
+namespace AirwayAPI.Models;
 
 public partial class eHelpDeskContext : DbContext
 {
@@ -42,6 +41,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<PhoneNumber> PhoneNumbers { get; set; }
 
+    public virtual DbSet<PortalMenu> PortalMenus { get; set; }
+
     public virtual DbSet<QtQuote> QtQuotes { get; set; }
 
     public virtual DbSet<QtSalesOrder> QtSalesOrders { get; set; }
@@ -63,6 +64,8 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<TcPayPeriod> TcPayPeriods { get; set; }
 
     public virtual DbSet<TcPto> TcPtos { get; set; }
+
+    public virtual DbSet<TrkUsage> TrkUsages { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
@@ -749,10 +752,6 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.ModifiedDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
-            entity.Property(e => e.NeedToBuy).HasDefaultValueSql("((0))");
-            entity.Property(e => e.NeedToBuyTs)
-                .HasColumnType("datetime")
-                .HasColumnName("NeedToBuyTS");
             entity.Property(e => e.OnGoingDate)
                 .HasDefaultValueSql("('1/1/00')")
                 .HasColumnType("datetime");
@@ -930,6 +929,46 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("PhoneNumber");
             entity.Property(e => e.UserId).HasColumnName("UserID");
+        });
+
+        modelBuilder.Entity<PortalMenu>(entity =>
+        {
+            entity.ToTable("PortalMenu");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AccessIds)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("AccessIDs");
+            entity.Property(e => e.Al)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("AL");
+            entity.Property(e => e.Caption)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.Link)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.MenuName)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('Default')");
+            entity.Property(e => e.MgrsRpt).HasDefaultValueSql("((0))");
+            entity.Property(e => e.MostUsed).HasDefaultValueSql("((0))");
+            entity.Property(e => e.ReportOption).HasDefaultValueSql("((0))");
+            entity.Property(e => e.RootId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("rootID");
+            entity.Property(e => e.Show)
+                .HasDefaultValueSql("((1))")
+                .HasColumnName("show");
+            entity.Property(e => e.Target)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("target");
+            entity.Property(e => e.ZOrder)
+                .HasMaxLength(4)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("zOrder");
         });
 
         modelBuilder.Entity<QtQuote>(entity =>
@@ -1390,6 +1429,27 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("DeptID");
             entity.Property(e => e.StartBalance).HasDefaultValueSql("((0))");
             entity.Property(e => e.Username).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkUsage>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("trkUsage");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.AppId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("appID");
+            entity.Property(e => e.EntryDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Ipaddress)
+                .HasMaxLength(50)
+                .HasColumnName("IPAddress");
+            entity.Property(e => e.Uname)
+                .HasMaxLength(25)
+                .HasColumnName("UName");
         });
 
         modelBuilder.Entity<User>(entity =>

@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class RequestEvent
 {
@@ -20,7 +23,7 @@ public partial class RequestEvent
 
     public bool? InOutBound { get; set; }
 
-    public string Manufacturer { get; set; }
+    public string? Manufacturer { get; set; }
 
     public string? Platform { get; set; }
 
