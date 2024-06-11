@@ -1,6 +1,9 @@
 ﻿using AirwayAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace AirwayAPI.Controllers
 {
@@ -19,58 +22,62 @@ namespace AirwayAPI.Controllers
         [HttpGet("{mfg}/{anc}/{fne}")]
         public async Task<ActionResult<IEnumerable<MassMailerVendor>>> GetVendors(string mfg, bool anc, bool fne)
         {
-            var queryForCamContacts = _context.CamContacts
-                .Where(vendor => vendor.Email != null && vendor.Email.Contains('@') && vendor.ActiveStatus == 1);
+            // Fetch data from the database first
+            var vendors = await _context.CamContacts
+                .Where(vendor => vendor.Email != null && vendor.ActiveStatus == 1)
+                .ToListAsync();
 
+            // Apply in-memory filtering for Email containing '@'
+            vendors = vendors.Where(vendor => vendor.Email.Contains('@')).ToList();
+
+            // Apply in-memory filtering for Mfgs
             if (mfg.Trim().ToLower() != "all")
             {
-                queryForCamContacts = queryForCamContacts.Where(vendor => 
-                    vendor.Mfgs != null && 
+                vendors = vendors.Where(vendor =>
+                    vendor.Mfgs != null &&
                     vendor.Mfgs.ToLower().Contains(mfg.Trim().ToLower())
-                );
+                ).ToList();
             }
 
+            // Apply in-memory filtering for ContactType
             if (anc == false && fne == false)
             {
-                queryForCamContacts = queryForCamContacts.Where(vendor =>
+                vendors = vendors.Where(vendor =>
                     (vendor.ContactType ?? string.Empty).Trim() == "Reseller" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "FNE Vendor" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "OEM" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Ancillary Vendor" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Central Office" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Service Vendor"
-                );
-
+                ).ToList();
             }
             else if (anc == true)
             {
-                queryForCamContacts = queryForCamContacts.Where(vendor =>
+                vendors = vendors.Where(vendor =>
                     (vendor.ContactType ?? string.Empty).Trim() == "OEM" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Ancillary Vendor" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Central Office" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "Service Vendor"
-                );
+                ).ToList();
             }
             else if (fne == true)
             {
-                queryForCamContacts = queryForCamContacts.Where(vendor =>
+                vendors = vendors.Where(vendor =>
                     (vendor.ContactType ?? string.Empty).Trim() == "Reseller" ||
                     (vendor.ContactType ?? string.Empty).Trim() == "FNE Vendor"
-                );
+                ).ToList();
             }
 
-
-            var queryForVendors = queryForCamContacts.Select(vendor => new MassMailerVendor
+            var queryForVendors = vendors.Select(vendor => new MassMailerVendor
             {
                 Id = vendor.Id,
                 Contact = vendor.Contact ?? string.Empty,
                 Email = vendor.Email ?? string.Empty,
                 Company = vendor.Company ?? string.Empty,
                 MainVendor = vendor.MainVendor
-            }).OrderBy(vendor => vendor.Company).ToListAsync();
+            }).OrderBy(vendor => vendor.Company).ToList();
 
-
-            return await queryForVendors;
+            return Ok(queryForVendors);
         }
     }
 }
