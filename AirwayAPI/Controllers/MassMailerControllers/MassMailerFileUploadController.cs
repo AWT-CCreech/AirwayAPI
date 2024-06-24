@@ -8,7 +8,7 @@ namespace AirwayAPIControllers
     public class MassMailerFileUploadController : ControllerBase
     {
         [HttpGet("{username}")]
-        public IActionResult clearFolder(string username)
+        public IActionResult ClearFolder(string username)
         {
             try
             {
@@ -17,7 +17,7 @@ namespace AirwayAPIControllers
                 {
                     Directory.CreateDirectory(path);
                 }
-                DirectoryInfo di = new DirectoryInfo(path);
+                DirectoryInfo di = new(path);
 
                 foreach (FileInfo file in di.GetFiles())
                 {
@@ -38,7 +38,7 @@ namespace AirwayAPIControllers
             try
             {
                 var files = Request.Form.Files;
-                List<string> fileNames = new List<string>();
+                List<string> fileNames = new();
                 var folderName = Path.Combine("Files", "MassMailerAttachment", Request.Form["username"].ToString().Trim().ToLower());
                 var path = Path.Combine(Directory.GetCurrentDirectory(), folderName);
                

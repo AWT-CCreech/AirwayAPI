@@ -19,7 +19,7 @@ namespace AirwayAPI.Controllers
         [HttpGet("{userId}")]
         public async Task<ActionResult<IEnumerable<MassMailerPartItem>>> GetEquipmentRequest(int userId)
         {
-            List<MassMailerPartItem> items = new List<MassMailerPartItem>();
+            List<MassMailerPartItem> items = new();
             /*-----------  Query for showing Today's Marked Mass Mailings  -----------*
              *----------- for that user - THAT HAVE PART NUMBERS (grouped) -----------*/
             string company = "";
@@ -39,9 +39,9 @@ namespace AirwayAPI.Controllers
                     er.MassMailSentBy == userId &&
                     ((er.PartNum ?? string.Empty).Trim().Length > 1 ||
                      (er.AltPartNum ?? string.Empty).Trim().Length > 1)) // Check if PartNum and AltPartNum are not null
-                .OrderBy(er => er.PartNum)
                 .Select(er => new { PartNum = er.PartNum ?? string.Empty, AltPartNum = er.AltPartNum ?? string.Empty }) // Ensure non-null values
                 .Distinct()
+                .OrderBy(er => er.PartNum)
                 .ToListAsync();
 
 

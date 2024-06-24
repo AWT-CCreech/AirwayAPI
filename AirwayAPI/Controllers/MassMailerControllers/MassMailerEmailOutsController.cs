@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using MimeKit.Utils;
 using System.Data;
+using Microsoft.Extensions.Logging;
 
 namespace AirwayAPI.Controllers
 {
@@ -17,10 +18,12 @@ namespace AirwayAPI.Controllers
     public class MassMailerEmailOutsController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
+        private readonly ILogger<MassMailerEmailOutsController> _logger;
 
-        public MassMailerEmailOutsController(eHelpDeskContext context)
+        public MassMailerEmailOutsController(eHelpDeskContext context, ILogger<MassMailerEmailOutsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -28,18 +31,17 @@ namespace AirwayAPI.Controllers
         {
             try
             {
-                SmtpClient client = new SmtpClient();
+                SmtpClient client = new();
                 await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
                 if (input?.SenderUserName == null || input?.Password == null)
                 {
-                    throw new ArgumentNullException("SenderUserName and Password cannot be null");
+                    throw new ArgumentNullException($"{input?.SenderUserName} and {input?.Password} cannot be null");
                 }
 
                 string senderUserName = input.SenderUserName.Trim().ToLower();
                 string email = senderUserName == "lvonderporten" ? "lvonder@airway.com" : senderUserName + "@airway.com";
 
                 await client.AuthenticateAsync(email, LoginUtils.decryptPassword(input.Password));
-
 
                 User? senderInfo;
                 if (input.SenderUserName.Trim().ToLower() == "lvonder")
@@ -58,13 +60,10 @@ namespace AirwayAPI.Controllers
 
                 if (senderInfo == null)
                 {
-                    // Handle the case where senderInfo is null
                     return NotFound("Sender information not found.");
                 }
 
                 string senderFullname = (senderInfo.Fname ?? string.Empty) + " " + (senderInfo.Lname ?? string.Empty);
-
-
 
                 if (!string.IsNullOrEmpty(input.SenderUserName) && input.SenderUserName.Trim().ToLower() == "lvonderporten")
                 {
@@ -86,13 +85,12 @@ namespace AirwayAPI.Controllers
                 }
                 else
                 {
-                    // Handle the case where SenderUserName is null or empty
                     return BadRequest("SenderUserName cannot be null or empty.");
                 }
 
                 if (input?.CCEmails == null || input?.CCNames == null)
                 {
-                    throw new ArgumentNullException("CCEmails and CCNames cannot be null");
+                    throw new ArgumentNullException($"{input?.CCEmails} and {input?.CCNames} cannot be null");
                 }
 
                 if (input.CCEmails.Length != input.CCNames.Length)
@@ -124,12 +122,12 @@ namespace AirwayAPI.Controllers
 
                 if (input?.AttachFiles == null)
                 {
-                    throw new ArgumentNullException("AttachFiles cannot be null");
+                    throw new ArgumentNullException($"{input?.AttachFiles} cannot be null");
                 }
 
                 if (string.IsNullOrWhiteSpace(folderName))
                 {
-                    throw new ArgumentNullException("folderName cannot be null or empty");
+                    throw new ArgumentNullException($"{folderName} cannot be null or empty");
                 }
 
                 foreach (string fileName in input.AttachFiles)
@@ -141,8 +139,7 @@ namespace AirwayAPI.Controllers
                     }
                 }
 
-                // attach logos
-                string[] logos = { "image1.png", "image2.png", "image3.png", "image4.jpg", "image5.jpg" };
+                string[] logos = { "image1.png", "image2.png", "image3.png", "image4.png", "image5.png" };
                 var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Files", "Logos");
 
                 for (int i = 0; i < logos.Length; ++i)
@@ -153,10 +150,9 @@ namespace AirwayAPI.Controllers
                     emailContent = emailContent.Replace($"%%IMAGE{i + 1}%%", image.ContentId);
                 }
 
-                // insert the main mass mailer history into the record
                 var commandText = "EXEC usp_ins_MassMailers @MassMailDesc, @DateSent, @UserID, @Id OUT";
                 if (input?.Subject == null)
-                    throw new ArgumentNullException("Subject cannot be null");
+                    throw new ArgumentNullException($"{input?.Subject} cannot be null");
                 var sanitizedSubject = input.Subject.Replace("'", "''");
                 var desc = new SqlParameter("@MassMailDesc", sanitizedSubject);
                 var date = new SqlParameter("@DateSent", DateTime.Now);
@@ -165,27 +161,25 @@ namespace AirwayAPI.Controllers
 
                 _context.Database.ExecuteSqlRaw(commandText, new[] { desc, date, userId, massMailId });
 
-                // send out emails
                 if (input?.RecipientEmails == null || input?.items == null || input?.RecipientCompanies == null || input?.RecipientNames == null || input?.RecipientIds == null)
                 {
-                    throw new ArgumentNullException("One or more required fields are null");
+                    throw new ArgumentNullException($"{input?.RecipientEmails}, {input?.items}, {input?.RecipientCompanies}, {input?.RecipientNames}, or {input?.RecipientIds} fields are null");
                 }
 
                 for (int i = 0; i < input.RecipientEmails.Length; ++i)
                 {
                     if (string.IsNullOrWhiteSpace(input.RecipientEmails[i]) || string.IsNullOrWhiteSpace(input.RecipientCompanies[i]) || string.IsNullOrWhiteSpace(input.RecipientNames[i]))
                     {
-                        throw new ArgumentNullException("RecipientEmails, RecipientCompanies, and RecipientNames cannot contain null or whitespace values");
+                        throw new ArgumentNullException($"{input.RecipientEmails}, {input.RecipientCompanies}, and {input.RecipientNames} cannot contain null or contain whitespace values");
                     }
 
-                    // Check to see if this part is marked under a Competitor
-                    List<MassMailerPartItem> items = new List<MassMailerPartItem>();
+                    List<MassMailerPartItem> items = new();
                     for (var j = 0; j < input.items.Length; ++j)
                     {
                         var item = input.items[j];
                         if (item == null)
                         {
-                            continue; // Skip null items
+                            continue;
                         }
 
                         var check = await (from c in _context.SellOpCompetitors
@@ -225,7 +219,6 @@ namespace AirwayAPI.Controllers
                                 DateSent = DateTime.Now
                             });
 
-                            // CHECK TO SEE IF REQUEST HAS BEEN ASSIGNED YET - IF NOT ASSIGN IT TO THE PURCH REP
                             int callCnt = await _context.CompetitorCalls.Where(c => c.RequestId == item.Id && c.CallType == "Purchasing")
                                 .Select(c => c.CallId).CountAsync();
                             if (callCnt < 1)
@@ -234,13 +227,9 @@ namespace AirwayAPI.Controllers
                                 if (er != null)
                                 {
                                     er.ProcureRep = senderInfo.Id;
-                                    // If you need to save changes to the database, include the following line:
-                                    // await _context.SaveChangesAsync();
                                 }
                                 else
                                 {
-                                    // Handle the case where er is null
-                                    // throw new Exception("EquipmentRequest not found.");
                                     return NotFound("EquipmentRequest not found.");
                                 }
                             }
@@ -265,14 +254,24 @@ namespace AirwayAPI.Controllers
                         await _context.SaveChangesAsync();
                     }
 
-                    // if at least 1 part item is being sent
                     if (items.Count > 0)
                     {
                         var temp = input.RecipientNames[i].Split(' ');
                         var firstName = temp[0];
                         string lastName = temp.Length >= 2 ? temp[^1] : string.Empty;
 
-                        message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.RecipientEmails[i].Trim()));
+                        // Check if running on localhost
+                        bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost";
+
+                        if (isLocalhost)
+                        {
+                            // Only send to current user
+                            message.To.Add(new MailboxAddress(senderFullname, email));
+                        }
+                        else
+                        {
+                            message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.RecipientEmails[i].Trim()));
+                        }
 
                         var partTable = "";
                         items.ForEach(item =>
@@ -310,9 +309,11 @@ namespace AirwayAPI.Controllers
                 client.Dispose();
 
                 return Ok();
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message + "    .........    " + ex.StackTrace);
+                _logger.LogError(ex, "An error occurred while sending email.");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message, stackTrace = ex.StackTrace });
             }
         }
     }

@@ -28,7 +28,7 @@ namespace AirwayAPI.Controllers
                 .ToListAsync();
 
             // Apply in-memory filtering for Email containing '@'
-            vendors = vendors.Where(vendor => vendor.Email.Contains('@')).ToList();
+            vendors = vendors.Where(vendor => vendor.Email != null && vendor.Email.Contains('@')).ToList();
 
             // Apply in-memory filtering for Mfgs
             if (mfg.Trim().ToLower() != "all")

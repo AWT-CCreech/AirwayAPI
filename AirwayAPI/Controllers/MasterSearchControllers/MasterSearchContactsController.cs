@@ -30,7 +30,7 @@ namespace AirwayAPI.Controllers.MasterSearch
                     Company = cc.Company,
                     State = cc.State,
                     PhoneMain = cc.PhoneMain,
-                    ActiveStatus = cc.ActiveStatus == 1 ? true : false
+                    ActiveStatus = cc.ActiveStatus == 1
                 }).ToListAsync();
                                 
             return Ok(contacts);

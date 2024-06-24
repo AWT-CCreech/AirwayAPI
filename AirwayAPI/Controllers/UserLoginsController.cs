@@ -107,9 +107,9 @@ namespace AirwayAPI.Controllers
             return Ok(user);
         }
 
-        private bool IsBase64String(string base64)
+        private static bool IsBase64String(string base64)
         {
-            Span<byte> buffer = new Span<byte>(new byte[base64.Length]);
+            Span<byte> buffer = new(new byte[base64.Length]);
             return Convert.TryFromBase64String(base64, buffer, out _);
         }
     }
