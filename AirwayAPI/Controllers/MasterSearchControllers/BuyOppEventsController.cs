@@ -31,7 +31,7 @@ namespace AirwayAPI.Controllers.MasterSearch
 
             if (input.Search != null && input.Search.Trim() != "")
             {
-                MS_Utils.insertSearchQuery(_context, input, "Buy Opp", "Event");
+                MS_Utils.InsertSearchQuery(_context, input, "Buy Opp", "Event");
                 var search = input.Search.ToLower();
                 var buyOppEvents = await (from be in _context.BuyingOppEvents
                                           join cc in _context.CamContacts on be.ContactId equals cc.Id

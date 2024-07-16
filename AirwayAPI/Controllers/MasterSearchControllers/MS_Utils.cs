@@ -1,11 +1,12 @@
-﻿using AirwayAPI.Models;
+﻿using AirwayAPI.Data;
+using AirwayAPI.Models;
 using AirwayAPI.Models.MasterSearch;
 
 namespace AirwayAPI.Controllers.MasterSearch
 {
     public static class MS_Utils
     {
-        public static void insertSearchQuery(eHelpDeskContext context, SearchInput input, string searchFor, string searchType)
+        public static void InsertSearchQuery(eHelpDeskContext context, SearchInput input, string searchFor, string searchType)
         {
             context.MasterSearchQueries.Add(new MasterSearchQuery
             {

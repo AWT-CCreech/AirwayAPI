@@ -34,7 +34,7 @@ namespace AirwayAPI.Controllers.MasterSearch
 
                 if (!string.IsNullOrEmpty(input.Search))
                 {
-                    MS_Utils.insertSearchQuery(_context, input, "Sell Opp", "Detail");
+                    MS_Utils.InsertSearchQuery(_context, input, "Sell Opp", "Detail");
                     var search = input.Search;
 
                     var sellOppDetails = await (from re in _context.RequestEvents
