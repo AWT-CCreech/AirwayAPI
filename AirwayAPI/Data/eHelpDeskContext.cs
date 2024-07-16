@@ -1,6 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using System.Collections.Generic;
+using AirwayAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Models;
+namespace AirwayAPI.Data;
 
 public partial class eHelpDeskContext : DbContext
 {
@@ -68,6 +71,10 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<TrkUsage> TrkUsages { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserPortalMenu> UserPortalMenus { get; set; }
+
+    public virtual DbSet<UserPref> UserPrefs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -752,6 +759,9 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.ModifiedDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+            entity.Property(e => e.NeedToBuyTs)
+                .HasColumnType("datetime")
+                .HasColumnName("NeedToBuyTS");
             entity.Property(e => e.OnGoingDate)
                 .HasDefaultValueSql("('1/1/00')")
                 .HasColumnType("datetime");
@@ -1578,6 +1588,50 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(20)
                 .HasColumnName("UName");
             entity.Property(e => e.ZoomPref).HasDefaultValueSql("((100))");
+        });
+
+        modelBuilder.Entity<UserPortalMenu>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("UserPortalMenu");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.AppId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("AppID");
+            entity.Property(e => e.DeptId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("DeptID");
+            entity.Property(e => e.EntryDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.MenuType).HasMaxLength(25);
+            entity.Property(e => e.UserId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("UserID");
+        });
+
+        modelBuilder.Entity<UserPref>(entity =>
+        {
+            entity.HasNoKey();
+
+            entity.Property(e => e.DefaultPref).HasDefaultValueSql("((0))");
+            entity.Property(e => e.PrefData)
+                .HasMaxLength(2048)
+                .IsUnicode(false);
+            entity.Property(e => e.PrefName)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PrefType)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.RowId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("rowID");
+            entity.Property(e => e.UserName)
+                .HasMaxLength(20)
+                .IsUnicode(false);
         });
 
         OnModelCreatingPartial(modelBuilder);

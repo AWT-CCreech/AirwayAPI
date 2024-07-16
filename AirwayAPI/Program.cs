@@ -1,4 +1,4 @@
-using AirwayAPI.Models;
+using AirwayAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 

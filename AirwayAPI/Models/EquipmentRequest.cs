@@ -142,5 +142,9 @@ public partial class EquipmentRequest
 
     public byte? Porequired { get; set; }
 
+    public int? NeedToBuy { get; set; }
+
+    public DateTime? NeedToBuyTs { get; set; }
+
     public bool? SoldWborder { get; set; }
 }

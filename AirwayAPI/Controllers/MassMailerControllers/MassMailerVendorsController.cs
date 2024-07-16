@@ -1,4 +1,5 @@
-﻿using AirwayAPI.Models;
+﻿using AirwayAPI.Data;
+using AirwayAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
