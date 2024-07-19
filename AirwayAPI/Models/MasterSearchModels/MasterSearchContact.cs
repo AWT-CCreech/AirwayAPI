@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Models.MasterSearchModels
+namespace AirwayAPI.Data.MasterSearchModels
 {
     public class MasterSearchContact
     {

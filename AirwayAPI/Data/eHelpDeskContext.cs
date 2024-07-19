@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using AirwayAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Data;
@@ -42,6 +41,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<MasterSearchQuery> MasterSearchQueries { get; set; }
 
+    public virtual DbSet<OpenSoreport> OpenSoreports { get; set; }
+
     public virtual DbSet<PhoneNumber> PhoneNumbers { get; set; }
 
     public virtual DbSet<PortalMenu> PortalMenus { get; set; }
@@ -58,6 +59,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<ShorelineUser> ShorelineUsers { get; set; }
 
+    public virtual DbSet<SimpleList> SimpleLists { get; set; }
+
     public virtual DbSet<TcEntry> TcEntries { get; set; }
 
     public virtual DbSet<TcHistory> TcHistories { get; set; }
@@ -67,6 +70,18 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<TcPayPeriod> TcPayPeriods { get; set; }
 
     public virtual DbSet<TcPto> TcPtos { get; set; }
+
+    public virtual DbSet<TrkInventory> TrkInventories { get; set; }
+
+    public virtual DbSet<TrkPolog> TrkPologs { get; set; }
+
+    public virtual DbSet<TrkRwPoheader> TrkRwPoheaders { get; set; }
+
+    public virtual DbSet<TrkRwSodetail> TrkRwSodetails { get; set; }
+
+    public virtual DbSet<TrkRwSoheader> TrkRwSoheaders { get; set; }
+
+    public virtual DbSet<TrkSonote> TrkSonotes { get; set; }
 
     public virtual DbSet<TrkUsage> TrkUsages { get; set; }
 
@@ -928,6 +943,77 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.SoNo).HasDefaultValueSql("((0))");
         });
 
+        modelBuilder.Entity<OpenSoreport>(entity =>
+        {
+            entity.HasKey(e => e.Id).IsClustered(false);
+
+            entity.ToTable("OpenSOReport");
+
+            entity.HasIndex(e => e.SalesRep, "NonClusteredIndex-20220118-135229");
+
+            entity.Property(e => e.AccountNo)
+                .HasMaxLength(25)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.AccountTeam)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.AllHere).HasDefaultValueSql("((0))");
+            entity.Property(e => e.AmountLeft)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money");
+            entity.Property(e => e.Category).HasMaxLength(50);
+            entity.Property(e => e.CustPo)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("CustPO");
+            entity.Property(e => e.CustomerName).HasMaxLength(100);
+            entity.Property(e => e.EntryDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EventId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("EventID");
+            entity.Property(e => e.ExpectedDelivery)
+                .HasDefaultValueSql("(((1)/(1))/(1990))")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ItemNum).HasMaxLength(25);
+            entity.Property(e => e.LeftToShip).HasDefaultValueSql("((0))");
+            entity.Property(e => e.MfgNum)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.OrderDate).HasColumnType("datetime");
+            entity.Property(e => e.OrgLeftToShip).HasDefaultValueSql("((0))");
+            entity.Property(e => e.PoissueDate)
+                .HasDefaultValueSql("(((1)/(1))/(1990))")
+                .HasColumnType("datetime")
+                .HasColumnName("POIssueDate");
+            entity.Property(e => e.Ponote)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("PONote");
+            entity.Property(e => e.PonoteDate)
+                .HasColumnType("datetime")
+                .HasColumnName("PONoteDate");
+            entity.Property(e => e.Ponum)
+                .HasMaxLength(250)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("PONum");
+            entity.Property(e => e.QtyOrdered).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QtyReceived).HasDefaultValueSql("((0))");
+            entity.Property(e => e.ReceivedOnPothatDay)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("ReceivedOnPOThatDay");
+            entity.Property(e => e.RequiredDate).HasColumnType("datetime");
+            entity.Property(e => e.SalesRep)
+                .HasMaxLength(25)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.Sonum)
+                .HasMaxLength(10)
+                .HasColumnName("SONum");
+            entity.Property(e => e.UnitPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money");
+        });
+
         modelBuilder.Entity<PhoneNumber>(entity =>
         {
             entity.HasKey(e => e.Id).IsClustered(false);
@@ -1369,6 +1455,29 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.PhoneName).HasMaxLength(50);
         });
 
+        modelBuilder.Entity<SimpleList>(entity =>
+        {
+            entity.HasKey(e => e.Id).IsClustered(false);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Ldesc)
+                .HasMaxLength(255)
+                .HasColumnName("LDesc");
+            entity.Property(e => e.Litem)
+                .HasMaxLength(50)
+                .HasColumnName("LItem");
+            entity.Property(e => e.Ltag)
+                .HasMaxLength(50)
+                .HasColumnName("LTag");
+            entity.Property(e => e.Ltype)
+                .HasMaxLength(50)
+                .HasColumnName("LType");
+            entity.Property(e => e.MetalCategory).HasMaxLength(50);
+            entity.Property(e => e.ResTech)
+                .HasDefaultValueSql("((11))")
+                .HasColumnName("resTech");
+        });
+
         modelBuilder.Entity<TcEntry>(entity =>
         {
             entity.HasKey(e => e.RowId);
@@ -1439,6 +1548,272 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("DeptID");
             entity.Property(e => e.StartBalance).HasDefaultValueSql("((0))");
             entity.Property(e => e.Username).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkInventory>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkInventory");
+
+            entity.HasIndex(e => new { e.CycleCountFlag, e.CycleCountDate }, "IX_trkInventory_CycleCountAndDate").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.ItemNum2, e.MfgDiscount, e.TrkListPrice, e.TrkUnitCost, e.EditDate }, "IX_trkInventory_ItemNum2").HasFillFactor(80);
+
+            entity.HasIndex(e => e.ItemNum, "trkInventory_ItemNum").HasFillFactor(80);
+
+            entity.Property(e => e.ActualDimension)
+                .HasDefaultValueSql("((1))")
+                .HasComment("Is the dimension Actual or for Packaging; default to actual = 1 and they'll update if it's packaging");
+            entity.Property(e => e.Category)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.Comments).HasMaxLength(500);
+            entity.Property(e => e.CycleActualCount).HasDefaultValueSql("((0))");
+            entity.Property(e => e.CycleCountBy).HasMaxLength(25);
+            entity.Property(e => e.CycleCountDate).HasColumnType("datetime");
+            entity.Property(e => e.CycleCountFlag).HasDefaultValueSql("((0))");
+            entity.Property(e => e.DimensionsEditBy)
+                .HasMaxLength(25)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.DimensionsEditDate)
+                .HasDefaultValueSql("(((1)/(1))/(1900))")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Eccn)
+                .HasMaxLength(25)
+                .HasColumnName("ECCN");
+            entity.Property(e => e.EditDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EditedBy).HasDefaultValueSql("((23))");
+            entity.Property(e => e.Height).HasDefaultValueSql("((0))");
+            entity.Property(e => e.HeightInches).HasDefaultValueSql("((0))");
+            entity.Property(e => e.Htscode)
+                .HasMaxLength(25)
+                .HasColumnName("HTScode");
+            entity.Property(e => e.ItemNum)
+                .HasMaxLength(255)
+                .IsUnicode(false);
+            entity.Property(e => e.ItemNum2)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasDefaultValueSql("((0))");
+            entity.Property(e => e.LeadTime)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Length).HasDefaultValueSql("((0))");
+            entity.Property(e => e.LengthInches).HasDefaultValueSql("((0))");
+            entity.Property(e => e.MetalPartType).HasMaxLength(50);
+            entity.Property(e => e.MfgDiscontinued).HasDefaultValueSql("((0))");
+            entity.Property(e => e.MfgDiscount).HasDefaultValueSql("((0))");
+            entity.Property(e => e.PartType).HasMaxLength(50);
+            entity.Property(e => e.PricingExpires).HasDefaultValueSql("((0))");
+            entity.Property(e => e.ProductCode)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.ProductMgmt).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QtyThreshold).HasDefaultValueSql("((0))");
+            entity.Property(e => e.ReplacePartNum)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.RetainConfirmedBy).HasMaxLength(25);
+            entity.Property(e => e.RetainConfirmedDate).HasColumnType("datetime");
+            entity.Property(e => e.SalvageValue).HasDefaultValueSql("((0))");
+            entity.Property(e => e.TrkListPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("trkListPrice");
+            entity.Property(e => e.TrkUnitCost)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("trkUnitCost");
+            entity.Property(e => e.UnitMeasure)
+                .HasMaxLength(25)
+                .HasDefaultValueSql("(N'Each')");
+            entity.Property(e => e.UseValue).HasMaxLength(50);
+            entity.Property(e => e.Weight).HasDefaultValueSql("((0))");
+            entity.Property(e => e.Width).HasDefaultValueSql("((0))");
+            entity.Property(e => e.WidthInches).HasDefaultValueSql("((0))");
+        });
+
+        modelBuilder.Entity<TrkPolog>(entity =>
+        {
+            entity.ToTable("trkPOLog");
+
+            entity.HasIndex(e => new { e.Ponum, e.ItemNum }, "IX_trkPOLog_PoNumItemNum").HasFillFactor(80);
+
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("(N'AIR')")
+                .HasColumnName("CompanyID");
+            entity.Property(e => e.ContactId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("ContactID");
+            entity.Property(e => e.DateDelivered).HasColumnType("datetime");
+            entity.Property(e => e.Deleted).HasDefaultValueSql("((0))");
+            entity.Property(e => e.DeliveryDateEmail).HasDefaultValueSql("((0))");
+            entity.Property(e => e.EditDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EditedBy).HasDefaultValueSql("((23))");
+            entity.Property(e => e.ExpDelEditDate)
+                .HasMaxLength(75)
+                .IsUnicode(false);
+            entity.Property(e => e.ExpectedDelivery).HasColumnType("datetime");
+            entity.Property(e => e.IssueDate).HasColumnType("datetime");
+            entity.Property(e => e.IssuedBy)
+                .HasMaxLength(75)
+                .IsUnicode(false);
+            entity.Property(e => e.ItemNum)
+                .HasMaxLength(200)
+                .IsUnicode(false);
+            entity.Property(e => e.NoteEditDate)
+                .HasMaxLength(75)
+                .IsUnicode(false);
+            entity.Property(e => e.Notes)
+                .HasMaxLength(2000)
+                .IsUnicode(false);
+            entity.Property(e => e.PolineKey)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("POLineKey");
+            entity.Property(e => e.Ponum)
+                .HasMaxLength(200)
+                .HasColumnName("PONum");
+            entity.Property(e => e.QtyReceived).HasDefaultValueSql("((0))");
+            entity.Property(e => e.RequiredDate).HasColumnType("datetime");
+            entity.Property(e => e.SalesOrderNum)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.SalesRep).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkRwPoheader>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkRwPOHeader");
+
+            entity.HasIndex(e => e.PotrackNum, "IX_trkRwPOHeader").HasFillFactor(80);
+
+            entity.HasIndex(e => e.ApprovalDate, "IX_trkRwPOHeader_ActDate").HasFillFactor(80);
+
+            entity.HasIndex(e => e.ApprovalDate, "IX_trkRwPOHeader_ApprDate").HasFillFactor(80);
+
+            entity.HasIndex(e => e.CrtDate, "IX_trkRwPOHeader_CrtDate").HasFillFactor(80);
+
+            entity.HasIndex(e => e.IssueDate, "IX_trkRwPOHeader_IssDate").HasFillFactor(80);
+
+            entity.HasIndex(e => e.Poamt, "IX_trkRwPOHeader_PoAMT").HasFillFactor(80);
+
+            entity.HasIndex(e => e.Ponum, "IX_trkRwPOHeader_PoNum").HasFillFactor(80);
+
+            entity.Property(e => e.ActualCloseDate).HasColumnType("datetime");
+            entity.Property(e => e.ApprovalDate).HasColumnType("datetime");
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("(N'AIR')")
+                .HasColumnName("CompanyID");
+            entity.Property(e => e.CrtDate).HasColumnType("datetime");
+            entity.Property(e => e.CustomerNum).HasMaxLength(30);
+            entity.Property(e => e.IssueDate).HasColumnType("datetime");
+            entity.Property(e => e.IssuedBy).HasMaxLength(16);
+            entity.Property(e => e.OrderNum).HasMaxLength(30);
+            entity.Property(e => e.Poamt)
+                .HasColumnType("money")
+                .HasColumnName("POAmt");
+            entity.Property(e => e.Podesc)
+                .HasMaxLength(50)
+                .HasColumnName("PODesc");
+            entity.Property(e => e.Ponum)
+                .HasMaxLength(10)
+                .HasColumnName("PONum");
+            entity.Property(e => e.Postatus).HasColumnName("POStatus");
+            entity.Property(e => e.PotrackNum)
+                .HasMaxLength(10)
+                .HasColumnName("POTrackNum");
+            entity.Property(e => e.RequiredDate).HasColumnType("datetime");
+            entity.Property(e => e.VendorNum).HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<TrkRwSodetail>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkRwSODetail");
+
+            entity.HasIndex(e => e.Sonum, "IX_trkRwSODetail").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.ItemNum, e.QtyPicked, e.QtyOrdered, e.QtyShipped }, "IX_trkRwSODetail_4").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.ItemNum, e.QtyOrdered, e.QtyShipped }, "IX_trkRwSODetail_ItemNum_QtyOrderedShipped").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.Sonum, e.ItemNum }, "IX_trkRwSODetail_SOItemNum").HasFillFactor(80);
+
+            entity.Property(e => e.AccountTeam).HasMaxLength(20);
+            entity.Property(e => e.ExtTotal).HasColumnType("money");
+            entity.Property(e => e.ItemDesc).HasMaxLength(50);
+            entity.Property(e => e.ItemNum).HasMaxLength(20);
+            entity.Property(e => e.QtyOpenToShip).HasDefaultValueSql("((0))");
+            entity.Property(e => e.RowId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("rowID");
+            entity.Property(e => e.Sonum)
+                .HasMaxLength(10)
+                .HasColumnName("SONum");
+            entity.Property(e => e.UnitPrice).HasColumnType("money");
+        });
+
+        modelBuilder.Entity<TrkRwSoheader>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkRwSOHeader");
+
+            entity.HasIndex(e => e.CustNum, "IX_trkRwSOHeaderCustNum").HasFillFactor(80);
+
+            entity.HasIndex(e => e.OrderDate, "IX_trkRwSOHeaderOrdDate").HasFillFactor(80);
+
+            entity.HasIndex(e => e.OrderNum, "IX_trkRwSOHeaderOrdNo").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.Type, e.Status, e.CustNum }, "IX_trkRwSOHeader_TypeStatusCustNum").HasFillFactor(80);
+
+            entity.Property(e => e.AccountTeam).HasMaxLength(20);
+            entity.Property(e => e.Comments).HasMaxLength(256);
+            entity.Property(e => e.CustNum).HasMaxLength(16);
+            entity.Property(e => e.CustPo)
+                .HasMaxLength(50)
+                .HasColumnName("CustPO");
+            entity.Property(e => e.CustomerName).HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(50);
+            entity.Property(e => e.OrderDate).HasColumnType("datetime");
+            entity.Property(e => e.OrderNum).HasMaxLength(10);
+            entity.Property(e => e.QuoteTotal).HasColumnType("money");
+            entity.Property(e => e.RequiredDate).HasColumnType("datetime");
+            entity.Property(e => e.Rmanum)
+                .HasMaxLength(25)
+                .HasColumnName("RMANum");
+            entity.Property(e => e.ShipToNum).HasMaxLength(16);
+            entity.Property(e => e.Terms).HasMaxLength(25);
+        });
+
+        modelBuilder.Entity<TrkSonote>(entity =>
+        {
+            entity.ToTable("trkSONotes");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ContactId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("ContactID");
+            entity.Property(e => e.EnteredBy).HasMaxLength(50);
+            entity.Property(e => e.EntryDate).HasColumnType("datetime");
+            entity.Property(e => e.ModBy).HasMaxLength(50);
+            entity.Property(e => e.ModDate).HasColumnType("datetime");
+            entity.Property(e => e.NoteType)
+                .HasMaxLength(25)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.Notes).HasColumnType("ntext");
+            entity.Property(e => e.OrderNo).HasMaxLength(50);
+            entity.Property(e => e.PartNo).HasMaxLength(50);
         });
 
         modelBuilder.Entity<TrkUsage>(entity =>

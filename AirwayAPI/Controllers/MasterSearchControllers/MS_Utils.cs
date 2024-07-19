@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
-using AirwayAPI.Models.MasterSearch;
+using AirwayAPI.Data;
+using AirwayAPI.Data.MasterSearch;
 
 namespace AirwayAPI.Controllers.MasterSearch
 {

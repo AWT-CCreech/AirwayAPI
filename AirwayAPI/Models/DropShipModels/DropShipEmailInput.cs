@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Models.DropShipModels
+﻿namespace AirwayAPI.Data.DropShipModels
 {
     public class DropShipEmailInput
     {

@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Data;
-using AirwayAPI.Models;
+using AirwayAPI.Data;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -25,8 +25,8 @@ namespace AirwayAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<LoginInfo>> GetUsers([FromBody] LoginInfo login)
         {
-            _logger.LogInformation("Received login request for user: {Username}", login.username);
-            _logger.LogInformation("Payload: {Payload}", Newtonsoft.Json.JsonConvert.SerializeObject(login));
+            //_logger.LogInformation("Received login request for user: {Username}", login.username);
+            //_logger.LogInformation("Payload: {Payload}", Newtonsoft.Json.JsonConvert.SerializeObject(login));
 
             if (string.IsNullOrWhiteSpace(login.username) || string.IsNullOrWhiteSpace(login.password))
             {
@@ -59,34 +59,32 @@ namespace AirwayAPI.Controllers
                     }
                 }
 
-                using (var client = new SmtpClient())
+                using var client = new SmtpClient();
+                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync($"{login.username}@airway.com", login.password);
+
+                int userid = login.username.Trim().ToLower() switch
                 {
-                    await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                    await client.AuthenticateAsync($"{login.username}@airway.com", login.password);
+                    "mgibson" => 125,
+                    "lvonder" => 65,
+                    "kgildersleeve" => 229,
+                    _ => await _context.Users
+                                        .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == login.username.Trim().ToLower())
+                                        .Select(u => u.Id)
+                                        .FirstOrDefaultAsync()
+                };
 
-                    int userid = login.username.Trim().ToLower() switch
-                    {
-                        "mgibson" => 125,
-                        "lvonder" => 65,
-                        "kgildersleeve" => 229,
-                        _ => await _context.Users
-                                            .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == login.username.Trim().ToLower())
-                                            .Select(u => u.Id)
-                                            .FirstOrDefaultAsync()
-                    };
+                var user = new LoginInfo()
+                {
+                    userid = userid.ToString(),
+                    username = login.username,
+                    password = LoginUtils.encryptPassword(login.password)
+                };
 
-                    var user = new LoginInfo()
-                    {
-                        userid = userid.ToString(),
-                        username = login.username,
-                        password = LoginUtils.encryptPassword(login.password)
-                    };
+                await client.DisconnectAsync(true);
 
-                    await client.DisconnectAsync(true);
-
-                    _logger.LogInformation("Login successful for user: {Username}", login.username);
-                    return Ok(user);
-                }
+                _logger.LogInformation("Login successful for user: {Username}", login.username);
+                return Ok(user);
             }
             catch (Exception ex)
             {

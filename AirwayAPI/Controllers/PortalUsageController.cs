@@ -1,5 +1,5 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
+using AirwayAPI.Data;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AirwayAPI.Controllers

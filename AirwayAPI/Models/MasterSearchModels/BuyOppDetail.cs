@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Models.MasterSearch
+﻿namespace AirwayAPI.Data.MasterSearch
 {
     public class BuyOppDetail
     {

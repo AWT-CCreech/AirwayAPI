@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace AirwayAPI.Models;
+namespace AirwayAPI.Data;
 
 public partial class TcEntry
 {

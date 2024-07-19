@@ -1,7 +1,7 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Data;
-using AirwayAPI.Models;
-using AirwayAPI.Models.DropShipModels;
+using AirwayAPI.Data;
+using AirwayAPI.Data.DropShipModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;

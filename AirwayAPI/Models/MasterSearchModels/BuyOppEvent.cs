@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Models.MasterSearch
+namespace AirwayAPI.Data.MasterSearch
 {
     public class BuyOppEvent
     {
