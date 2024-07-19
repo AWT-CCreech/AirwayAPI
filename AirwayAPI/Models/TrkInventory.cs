@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace AirwayAPI.Data;
+namespace AirwayAPI.Models;
 
 public partial class TrkInventory
 {

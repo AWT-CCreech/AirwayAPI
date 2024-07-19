@@ -1,5 +1,5 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Data.MasterSearch;
+using AirwayAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,10 +40,10 @@ namespace AirwayAPI.Controllers.MasterSearch
                                           from lo1 in leftOuter1.DefaultIfEmpty()
                                           join es in _context.EquipmentSnapshots on be.EventId equals es.EventId into leftOuter2
                                           from lo2 in leftOuter2.DefaultIfEmpty()
-                                          where (input.PartNo == true ? (lo1.PartNum ?? string.Empty).ToLower().Contains(search) : false)
-                                              || (input.PartDesc == true ? (lo1.PartDesc ?? string.Empty).ToLower().Contains(search) : false)
-                                              || (input.Company == true ? (cc.Company ?? string.Empty).ToLower().Contains(search) : false)
-                                              || (input.ID == true && search.All(char.IsNumber) ? be.EventId.ToString() == search : false)
+                                          where (input.PartNo == true && (lo1.PartNum ?? string.Empty).ToLower().Contains(search))
+                                              || (input.PartDesc == true && (lo1.PartDesc ?? string.Empty).ToLower().Contains(search))
+                                              || (input.Company == true && (cc.Company ?? string.Empty).ToLower().Contains(search))
+                                              || (input.ID == true && search.All(char.IsNumber) && be.EventId.ToString() == search)
                                           select new
                                           {
                                               be.EventId,

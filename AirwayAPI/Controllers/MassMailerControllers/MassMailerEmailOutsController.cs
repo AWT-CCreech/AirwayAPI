@@ -1,5 +1,6 @@
 ﻿using AirwayAPI.Assets;
 using AirwayAPI.Data;
+using AirwayAPI.Models;
 using AirwayAPI.Application;
 using MailKit.Net.Smtp;
 using MailKit.Security;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Data
+namespace AirwayAPI.Models
 {
     public class MassMailerEmailInput
     {

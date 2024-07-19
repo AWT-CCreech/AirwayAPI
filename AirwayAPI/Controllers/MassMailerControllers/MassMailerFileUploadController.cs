@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 
-namespace AirwayAPIControllers
+namespace AirwayAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]

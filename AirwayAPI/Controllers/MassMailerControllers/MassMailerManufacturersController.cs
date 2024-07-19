@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPIControllers
+namespace AirwayAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]

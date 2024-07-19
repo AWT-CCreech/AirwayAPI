@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Data.MasterSearch
+namespace AirwayAPI.Models
 {
     public class SearchInput
     {

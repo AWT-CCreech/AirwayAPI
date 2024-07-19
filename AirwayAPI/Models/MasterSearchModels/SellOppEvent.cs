@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Data.MasterSearch
+﻿namespace AirwayAPI.Models
 {
     public class SellOppEvent
     {

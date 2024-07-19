@@ -1,5 +1,5 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Data.MasterSearch;
+using AirwayAPI.Models;
 
 namespace AirwayAPI.Controllers.MasterSearch
 {
