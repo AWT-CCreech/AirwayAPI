@@ -10,7 +10,6 @@ using MimeKit;
 using MimeKit.Utils;
 using System.Data;
 using Microsoft.Extensions.Logging;
-using AirwayAPI.Data;
 
 namespace AirwayAPI.Controllers
 {
