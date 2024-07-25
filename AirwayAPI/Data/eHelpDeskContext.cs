@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 using AirwayAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Data;
 
@@ -75,6 +75,8 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<TrkInventory> TrkInventories { get; set; }
 
     public virtual DbSet<TrkPolog> TrkPologs { get; set; }
+
+    public virtual DbSet<TrkPonote> TrkPonotes { get; set; }
 
     public virtual DbSet<TrkRwPoheader> TrkRwPoheaders { get; set; }
 
@@ -1686,6 +1688,21 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(500)
                 .IsUnicode(false);
             entity.Property(e => e.SalesRep).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkPonote>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("trkPONotes");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.EnteredBy).HasMaxLength(50);
+            entity.Property(e => e.EntryDate).HasColumnType("datetime");
+            entity.Property(e => e.Notes).HasColumnType("ntext");
+            entity.Property(e => e.Ponum)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("PONum");
         });
 
         modelBuilder.Entity<TrkRwPoheader>(entity =>
