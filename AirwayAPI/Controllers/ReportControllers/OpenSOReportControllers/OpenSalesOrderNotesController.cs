@@ -7,17 +7,17 @@ using Microsoft.EntityFrameworkCore;
 namespace AirwayAPI.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
-    public class OpenSONotesController : ControllerBase
+    [Route("api/[controller]")]
+    public class OpenSalesOrderNotesController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
 
-        public OpenSONotesController(eHelpDeskContext context)
+        public OpenSalesOrderNotesController(eHelpDeskContext context)
         {
             _context = context;
         }
 
-        [HttpGet("{soNum}/{partNum}")]
+        [HttpGet("GetNotes/{soNum}/{partNum}")]
         public async Task<IActionResult> GetNotes(string soNum, string partNum)
         {
             var notes = await _context.TrkSonotes
@@ -28,7 +28,7 @@ namespace AirwayAPI.Controllers
             return Ok(notes);
         }
 
-        [HttpPost]
+        [HttpPost("AddNote")]
         public async Task<IActionResult> AddNote([FromBody] TrkSonote note)
         {
             _context.TrkSonotes.Add(note);
@@ -37,7 +37,7 @@ namespace AirwayAPI.Controllers
             return CreatedAtAction(nameof(GetNotes), new { soNum = note.OrderNo, partNum = note.PartNo }, note);
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("UpdateNote/{id}")]
         public async Task<IActionResult> UpdateNote(int id, [FromBody] TrkSonote note)
         {
             if (id != note.Id)
@@ -51,7 +51,7 @@ namespace AirwayAPI.Controllers
             return NoContent();
         }
 
-        [HttpDelete("{id}")]
+        [HttpDelete("DeleteNote/{id}")]
         public async Task<IActionResult> DeleteNote(int id)
         {
             var note = await _context.TrkSonotes.FindAsync(id);
