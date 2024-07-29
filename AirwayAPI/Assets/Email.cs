@@ -31,9 +31,11 @@ namespace AirwayAPI.Assets
             @page WordSection1 {size:8.5in 11.0in; margin:1.0in 1.0in 1.0in 1.0in;}
             div.WordSection1 {page:WordSection1;}
             /* Table styling */
-            table {font-family: arial, sans-serif; border-collapse: collapse; width: 100%;}
-            td, th {border: 1px solid #dddddd; text-align: left; padding: 8px;}
-            tr:nth-child(even) {background-color: #dddddd;}
+            table {font-family: Arial, sans-serif; border-collapse: collapse; width: 100%; margin: 20px 0; border-spacing: 0;}
+            th, td {border: 1px solid rgba(224, 224, 224, 1); text-align: left; padding: 12px;}
+            th {background-color: rgba(0, 0, 0, 0.87); color: white;}
+            tr:nth-child(even) {background-color: rgba(0, 0, 0, 0.04);}
+            tr:hover {background-color: rgba(0, 0, 0, 0.08);}
             -->
             </style>
             <!--[if gte mso 9]><xml><o:shapedefaults v:ext=""edit"" spidmax=""1026"" /></xml><![endif]-->
@@ -67,7 +69,7 @@ namespace AirwayAPI.Assets
                 <span style='color:#1F497D'>
                     <img width=95 height=95 style='width:.9895in;height:.9895in' id=""Picture_x0020_1"" src=""cid:%%IMAGE1%%"" alt=""cid:image001.png"">
                 </span>
-                <a href=""http://www.sustainableelectronics.org/"">
+                <a href=""https://sustainableelectronics.org/find-an-r2-certified-facility/?appids=0010e00001OgjjRAAR&tab=12&backto=https://sustainableelectronics.org/find-an-r2-certified-facility/?type=byaddress&address=2350%2520Litton%2520Lane,%2520Suite%2520200&city=Hebron&postalcode=41048&country=United%2520States&state=Kentucky&measurements=M&measurements_value=20"">
                     <span style='color:windowtext;text-decoration:none'>
                         <img border=0 width=193 height=103 style='width:1.0729in;height:1.0729in' id=""Picture_x0020_2"" src=""cid:%%IMAGE2%%"" alt=""cid:image002.jpg"">
                     </span>
@@ -91,6 +93,7 @@ namespace AirwayAPI.Assets
                 </p>
             </div>
         </body>
-        </html>";
+        </html>
+        ";
     }
 }
