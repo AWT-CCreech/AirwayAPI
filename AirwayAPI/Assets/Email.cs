@@ -56,13 +56,13 @@ namespace AirwayAPI.Assets
                     <b><span style='color:#1F497D'> <o:p></o:p></span></b>
                 </p>
                 <p class=MsoNormal><b><span style='color:gray'>Direct:</span></b>
-                    <b><span style='color:#17365D'> </span></b><b><span lang=FR style='color:#17365D'>+1 </span></b>
+                    <b><span style='color:#17365D'> </span></b><b><span lang=EN style='color:#17365D'>+1 </span></b>
                     <b><span style='color:#17365D'> %%DIRECT%% </span></b><b><span style='color:gray'>|</span></b>
                     <span style='color:#1F497D'> </span><b><span style='color:gray'>Mobile:</span></b>
-                    <span style='color:#1F497D'> </span><b><span lang=FR style='color:#17365D'>+1 </span></b>
+                    <span style='color:#1F497D'> </span><b><span lang=EN style='color:#17365D'>+1 </span></b>
                     <b><span style='color:#17365D'> %%MOBILE%% </span></b><span style='color:#1F497D'> </span>
                     <b><span style='color:gray'>|</span></b><span style='color:#1F497D'> </span><b><span style='color:gray'>Fax: </span></b>
-                    <b><span lang=FR style='color:#17365D'>+1 </span></b><b><span style='color:#17365D'>859 689-0229 </span></b>
+                    <b><span lang=EN style='color:#17365D'>+1 </span></b><b><span style='color:#17365D'>859 689-0229 </span></b>
                     <b><o:p></o:p></b>
                 </p>
                 <p class=MsoNormal><span style='color:#1F497D'>
