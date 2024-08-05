@@ -44,12 +44,41 @@ namespace AirwayAPI.Controllers
         {
             var teams = await (from t in _context.SimpleLists
                                orderby t.Litem ascending
-                               where t.Ltype == "SalesTeam2"
+                               where t.Ltype == "SalesTeam2" && t.Litem != "All"
                                select new
                                {
+                                   t.Id,
                                    t.Litem
                                }).ToListAsync();
             return Ok(teams);
+        }
+
+        [HttpGet("GetCategories")]
+        public async Task<IActionResult> GetCategories()
+        {
+            var categories = await (from c in _context.SimpleLists
+                                    orderby c.Ltag ascending
+                                    where c.Ltype == "Category"
+                                    select new
+                                    {
+                                        c.Id,
+                                        c.Litem
+                                    }).ToListAsync();
+            return Ok(categories);
+        }
+
+        [HttpGet("GetAccountNumbers")]
+        public async Task<IActionResult> GetAccountNumbers()
+        {
+            var accounts = await _context.OpenSoreports
+                                          .Select(a => new { a.AccountNo })
+                                          .Distinct()
+                                          .ToListAsync();
+
+            // Sort the account numbers explicitly after fetching distinct values
+            var sortedAccounts = accounts.OrderBy(a => a.AccountNo).ToList();
+
+            return Ok(sortedAccounts);
         }
     }
 }
