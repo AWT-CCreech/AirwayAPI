@@ -112,19 +112,27 @@ namespace AirwayAPI.Controllers
                 query = query.Where(o => o.AllHere == true);
             }
 
-            if (chkGroupBySo)
+            var salesOrders = await query.OrderBy(o => o.Sonum).ToListAsync();
+
+            // Ensure eventId is not 0
+            foreach (var order in salesOrders)
             {
-                query = query
-                    .GroupBy(o => o.Sonum)
-                    .Select(g => new
-                    {
-                        Sonum = g.Key,
-                        Orders = g.ToList()
-                    })
-                    .SelectMany(g => g.Orders.Take(1)); // Take the first order from each group
+                if (order.EventId == 0)
+                {
+                    order.EventId = null; // or string.Empty if the type is string
+                }
             }
 
-            var salesOrders = await query.ToListAsync();
+            if (chkGroupBySo)
+            {
+                var groupedOrders = salesOrders
+                    .GroupBy(o => o.Sonum)
+                    .Select(g => g.First()) // Take the first order from each group
+                    .ToList();
+
+                return Ok(groupedOrders);
+            }
+
             return Ok(salesOrders);
         }
     }
