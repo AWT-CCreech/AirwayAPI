@@ -296,10 +296,10 @@ namespace AirwayAPI.Controllers
                         errorMessage.From.Add(new MailboxAddress(senderFullname, senderEmail));
                         errorMessage.To.Add(new MailboxAddress(senderFullname, senderEmail));
 
-                        errorMessage.Subject = "Fail to Send Mass Mailer due to empty part table";
+                        errorMessage.Subject = "Failed to Send Mass Mailer due to empty part table";
                         errorMessage.Body = new TextPart("plain")
                         {
-                            Text = $"The email that you are about to send to {input.RecipientCompanies[i].Trim()} ({input.RecipientNames[i].Trim()}) is cancelled due to empty part table (potentially caused by matching competitors)."
+                            Text = $"The email that you are attempting to send to {input.RecipientCompanies[i].Trim()} ({input.RecipientNames[i].Trim()}) has been cancelled due to an empty part table (potentially caused by matching competitors)."
                         };
                         await client.SendAsync(errorMessage);
                     }
