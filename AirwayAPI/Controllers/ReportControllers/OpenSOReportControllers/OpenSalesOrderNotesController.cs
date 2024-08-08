@@ -22,7 +22,7 @@ namespace AirwayAPI.Controllers
         {
             var notes = await _context.TrkSonotes
                 .Where(n => n.OrderNo == soNum && n.PartNo == partNum)
-                .Select(n => n.Notes)
+                .Select(n => new { n.Notes, n.EntryDate, n.EnteredBy })
                 .ToListAsync();
 
             return Ok(notes);
@@ -31,6 +31,14 @@ namespace AirwayAPI.Controllers
         [HttpPost("AddNote")]
         public async Task<IActionResult> AddNote([FromBody] TrkSonote note)
         {
+            if (note == null)
+            {
+                return BadRequest("Note cannot be null");
+            }
+
+            // Log the received note for debugging
+            Console.WriteLine($"Received Note: {System.Text.Json.JsonSerializer.Serialize(note)}");
+
             _context.TrkSonotes.Add(note);
             await _context.SaveChangesAsync();
 
