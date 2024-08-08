@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AirwayAPI.Data;
+using AirwayAPI.Models;
 
 namespace AirwayAPI.Controllers
 {
@@ -112,16 +113,31 @@ namespace AirwayAPI.Controllers
                 query = query.Where(o => o.AllHere == true);
             }
 
-            var salesOrders = await query.OrderBy(o => o.Sonum).ToListAsync();
-
-            // Ensure eventId is not 0
-            foreach (var order in salesOrders)
-            {
-                if (order.EventId == 0)
+            var salesOrders = await query
+                .Select(o => new
                 {
-                    order.EventId = null; // or string.Empty if the type is string
-                }
-            }
+                    o.EventId,
+                    o.Sonum,
+                    o.AccountTeam,
+                    o.CustomerName,
+                    o.CustPo,
+                    o.OrderDate,
+                    o.RequiredDate,
+                    o.ItemNum,
+                    o.MfgNum,
+                    o.AmountLeft,
+                    o.Ponum,
+                    o.PoissueDate,
+                    o.ExpectedDelivery,
+                    o.QtyOrdered,
+                    o.QtyReceived,
+                    notes = _context.TrkSonotes
+                        .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
+                        .Select(n => new { n.Notes, n.EntryDate, n.EnteredBy })
+                        .ToList()
+                })
+                .OrderBy(o => o.Sonum)
+                .ToListAsync();
 
             if (chkGroupBySo)
             {
