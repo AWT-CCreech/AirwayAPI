@@ -72,6 +72,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<TcPto> TcPtos { get; set; }
 
+    public virtual DbSet<TrkCompany> TrkCompanies { get; set; }
+
     public virtual DbSet<TrkInventory> TrkInventories { get; set; }
 
     public virtual DbSet<TrkPolog> TrkPologs { get; set; }
@@ -1551,6 +1553,19 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("DeptID");
             entity.Property(e => e.StartBalance).HasDefaultValueSql("((0))");
             entity.Property(e => e.Username).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkCompany>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("trkCompany");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasColumnName("CompanyID");
+            entity.Property(e => e.CompanyName).HasMaxLength(100);
         });
 
         modelBuilder.Entity<TrkInventory>(entity =>
