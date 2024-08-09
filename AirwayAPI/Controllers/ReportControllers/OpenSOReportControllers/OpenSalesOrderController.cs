@@ -131,6 +131,20 @@ namespace AirwayAPI.Controllers
                     o.ExpectedDelivery,
                     o.QtyOrdered,
                     o.QtyReceived,
+                    o.LeftToShip,
+                    // Retrieve the latest PO Log entry
+                    PoLog = (
+                        from poLog in _context.TrkPologs
+                        join poNote in _context.TrkPonotes on poLog.Ponum equals poNote.Ponum.ToString()
+                        where poLog.Ponum == o.Ponum
+                        orderby poNote.EntryDate descending
+                        select new
+                        {
+                            poLog.Id,
+                            poNote.EnteredBy,
+                            poNote.EntryDate // Ensure EntryDate is in correct format
+                        }
+                    ).FirstOrDefault(),
                     notes = _context.TrkSonotes
                         .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
                         .Select(n => new { n.Notes, n.EntryDate, n.EnteredBy })
@@ -138,6 +152,7 @@ namespace AirwayAPI.Controllers
                 })
                 .OrderBy(o => o.Sonum)
                 .ToListAsync();
+
 
             if (chkGroupBySo)
             {
