@@ -29,7 +29,7 @@ AirwayAPI is the main API utilized by the `awt-portal-app`, an internal portal a
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/airwayapi.git
+   git clone https://github.com/awt-ccreech/airwayapi.git
    cd airwayapi
 
 ## Usage
