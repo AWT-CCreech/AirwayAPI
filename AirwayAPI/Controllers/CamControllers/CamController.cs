@@ -20,9 +20,9 @@ namespace AirwayAPI.Controllers
 
         [HttpGet("ContactSearch")]
         public async Task<IActionResult> ContactSearch(
-            [FromQuery] string searchBy,
             [FromQuery] string username,
             [FromQuery] string searchText,
+            [FromQuery] string searchBy = "Contact",
             [FromQuery] bool activeOnly = true,
             [FromQuery] string orderBy = "Contact",
             [FromQuery] string companyId = "AIR")
