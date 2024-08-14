@@ -22,7 +22,18 @@ namespace AirwayAPI.Controllers
         {
             var notes = await _context.TrkSonotes
                 .Where(n => n.OrderNo == soNum && n.PartNo == partNum)
-                .Select(n => new { n.Notes, n.EntryDate, n.EnteredBy })
+                .Select(n => new
+                {
+                    n.Id,
+                    n.Notes,
+                    n.ContactId,
+                    ContactName = _context.CamContacts
+                                       .Where(c => c.Id == n.ContactId)
+                                       .Select(c => c.Contact)
+                                       .FirstOrDefault(),
+                    n.EntryDate,
+                    n.EnteredBy
+                })
                 .ToListAsync();
 
             return Ok(notes);
