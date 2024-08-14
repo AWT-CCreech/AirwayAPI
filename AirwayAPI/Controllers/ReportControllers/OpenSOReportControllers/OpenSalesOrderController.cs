@@ -142,12 +142,22 @@ namespace AirwayAPI.Controllers
                         {
                             poLog.Id,
                             poNote.EnteredBy,
-                            poNote.EntryDate // Ensure EntryDate is in correct format
+                            poNote.EntryDate
                         }
                     ).FirstOrDefault(),
                     notes = _context.TrkSonotes
                         .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
-                        .Select(n => new { n.Notes, n.EntryDate, n.EnteredBy })
+                        .Select(n => new
+                        {
+                            n.Notes,
+                            n.EntryDate,
+                            n.EnteredBy,
+                            n.ContactId,
+                            ContactName = _context.CamContacts
+                                            .Where(c => c.Id == n.ContactId)
+                                            .Select(c => c.Contact)
+                                            .FirstOrDefault() 
+                        })
                         .ToList()
                 })
                 .OrderBy(o => o.Sonum)
