@@ -1,7 +1,6 @@
 ﻿using AirwayAPI.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.InteropServices;
 
 namespace AirwayAPI.Controllers
 {
