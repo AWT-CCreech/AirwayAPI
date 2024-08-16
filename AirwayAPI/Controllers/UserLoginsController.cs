@@ -25,20 +25,18 @@ namespace AirwayAPI.Controllers
         [HttpPost]
         public async Task<ActionResult<LoginInfo>> GetUsers([FromBody] LoginInfo login)
         {
-            //_logger.LogInformation("Received login request for user: {Username}", login.username);
-            //_logger.LogInformation("Payload: {Payload}", Newtonsoft.Json.JsonConvert.SerializeObject(login));
-
             if (string.IsNullOrWhiteSpace(login.username) || string.IsNullOrWhiteSpace(login.password))
             {
                 _logger.LogWarning("Invalid login request: username or password is missing.");
                 return BadRequest(new { message = "Username or password cannot be empty." });
             }
 
-            int dbCheck = await _context.Users
-                                .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == login.username.Trim().ToLower())
-                                .CountAsync();
+            var usernameTrimmedLower = login.username.Trim().ToLower();
+            int userCount = await _context.Users
+                                          .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == usernameTrimmedLower)
+                                          .CountAsync();
 
-            if (dbCheck == 0 && !(new[] { "mgibson", "lvonder", "kgildersleeve" }.Contains(login.username.Trim().ToLower())))
+            if (userCount == 0 && !IsPredefinedUser(usernameTrimmedLower))
             {
                 _logger.LogWarning("User not found: {Username}", login.username);
                 return NotFound(new { message = "User not found." });
@@ -59,20 +57,14 @@ namespace AirwayAPI.Controllers
                     }
                 }
 
-                using var client = new SmtpClient();
-                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                await client.AuthenticateAsync($"{login.username}@airway.com", login.password);
-
-                int userid = login.username.Trim().ToLower() switch
+                var authResult = await AuthenticateUserAsync(login.username, login.password);
+                if (!authResult.IsSuccess)
                 {
-                    "mgibson" => 125,
-                    "lvonder" => 65,
-                    "kgildersleeve" => 229,
-                    _ => await _context.Users
-                                        .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == login.username.Trim().ToLower())
-                                        .Select(u => u.Id)
-                                        .FirstOrDefaultAsync()
-                };
+                    _logger.LogWarning("Authentication failed for user: {Username}", login.username);
+                    return StatusCode(401, new { message = "Authentication failed." });
+                }
+
+                int userid = await GetUserIdAsync(usernameTrimmedLower);
 
                 var user = new LoginInfo()
                 {
@@ -81,22 +73,62 @@ namespace AirwayAPI.Controllers
                     password = LoginUtils.encryptPassword(login.password)
                 };
 
-                await client.DisconnectAsync(true);
-
                 _logger.LogInformation("Login successful for user: {Username}", login.username);
                 return Ok(user);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Authentication failed for user: {Username}", login.username);
-                return StatusCode(500, new { message = "Authentication failed." });
+                _logger.LogError(ex, "An error occurred during login for user: {Username}", login.username);
+                return StatusCode(500, new { message = "An internal error occurred. Please try again later." });
             }
         }
+
+        private async Task<AuthenticationResult> AuthenticateUserAsync(string username, string password)
+        {
+            try
+            {
+                using var client = new SmtpClient();
+                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync($"{username}@airway.com", password);
+                await client.DisconnectAsync(true);
+
+                return AuthenticationResult.Success();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to authenticate user: {Username}", username);
+                return AuthenticationResult.Failure();
+            }
+        }
+
+        private async Task<int> GetUserIdAsync(string username)
+        {
+            return username switch
+            {
+                "mgibson" => 125,
+                "lvonder" => 65,
+                "kgildersleeve" => 229,
+                _ => await _context.Users
+                                   .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == username)
+                                   .Select(u => u.Id)
+                                   .FirstOrDefaultAsync()
+            };
+        }
+
+        private static bool IsPredefinedUser(string username) =>
+            new[] { "mgibson", "lvonder", "kgildersleeve" }.Contains(username);
 
         private static bool IsBase64String(string base64)
         {
             Span<byte> buffer = new(new byte[base64.Length]);
             return Convert.TryFromBase64String(base64, buffer, out _);
+        }
+
+        private class AuthenticationResult
+        {
+            public bool IsSuccess { get; private set; }
+            public static AuthenticationResult Success() => new() { IsSuccess = true };
+            public static AuthenticationResult Failure() => new() { IsSuccess = false };
         }
     }
 }
