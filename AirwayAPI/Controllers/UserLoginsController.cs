@@ -49,6 +49,7 @@ namespace AirwayAPI.Controllers
 
             try
             {
+                // Decrypt the password if it is encrypted
                 if (login.isPasswordEncrypted)
                 {
                     if (IsBase64String(login.password))
@@ -74,6 +75,10 @@ namespace AirwayAPI.Controllers
                 // Generate JWT token
                 var token = GenerateJwtToken(login.username);
 
+                // Re-encrypt the password before sending it back to the client
+                login.password = LoginUtils.encryptPassword(login.password);
+                login.isPasswordEncrypted = true; // Indicate that the password is now encrypted
+
                 // Populate the LoginInfo model with the user data and token
                 login.userid = userid.ToString();
                 login.token = token;
@@ -96,7 +101,6 @@ namespace AirwayAPI.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
-            // Retrieve the key from configuration and check for null
             var keyString = _configuration["Jwt:Key"];
             if (string.IsNullOrEmpty(keyString))
             {
