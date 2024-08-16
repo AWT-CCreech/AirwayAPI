@@ -5,7 +5,10 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace AirwayAPI.Controllers
 {
@@ -15,11 +18,13 @@ namespace AirwayAPI.Controllers
     {
         private readonly eHelpDeskContext _context;
         private readonly ILogger<UserLoginsController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public UserLoginsController(eHelpDeskContext context, ILogger<UserLoginsController> logger)
+        public UserLoginsController(eHelpDeskContext context, ILogger<UserLoginsController> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpPost]
@@ -66,21 +71,49 @@ namespace AirwayAPI.Controllers
 
                 int userid = await GetUserIdAsync(usernameTrimmedLower);
 
-                var user = new LoginInfo()
-                {
-                    userid = userid.ToString(),
-                    username = login.username,
-                    password = LoginUtils.encryptPassword(login.password)
-                };
+                // Generate JWT token
+                var token = GenerateJwtToken(login.username);
+
+                // Populate the LoginInfo model with the user data and token
+                login.userid = userid.ToString();
+                login.token = token;
 
                 _logger.LogInformation("Login successful for user: {Username}", login.username);
-                return Ok(user);
+                return Ok(login);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred during login for user: {Username}", login.username);
                 return StatusCode(500, new { message = "An internal error occurred. Please try again later." });
             }
+        }
+
+        private string GenerateJwtToken(string username)
+        {
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            // Retrieve the key from configuration and check for null
+            var keyString = _configuration["Jwt:Key"];
+            if (string.IsNullOrEmpty(keyString))
+            {
+                throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: creds);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private async Task<AuthenticationResult> AuthenticateUserAsync(string username, string password)
