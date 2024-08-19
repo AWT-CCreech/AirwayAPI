@@ -11,9 +11,11 @@ using MimeKit;
 using MimeKit.Utils;
 using System.Data;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AirwayAPI.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class MassMailerEmailOutsController : ControllerBase

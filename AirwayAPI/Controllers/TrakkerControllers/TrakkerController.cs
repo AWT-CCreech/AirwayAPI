@@ -1,9 +1,13 @@
 ﻿using AirwayAPI.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.TrakkerControllers
+namespace AirwayAPI.Controllers
 {
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
     public class TrakkerController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
