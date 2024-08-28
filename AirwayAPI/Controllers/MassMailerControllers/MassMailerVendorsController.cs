@@ -25,62 +25,62 @@ namespace AirwayAPI.Controllers
         [HttpGet("{mfg}/{anc}/{fne}")]
         public async Task<ActionResult<IEnumerable<MassMailerVendor>>> GetVendors(string mfg, bool anc, bool fne)
         {
-            // Fetch data from the database first
-            var vendors = await _context.CamContacts
-                .Where(vendor => vendor.Email != null && vendor.ActiveStatus == 1)
-                .ToListAsync();
+            // Prepare the base query asynchronously
+            var query = _context.CamContacts
+                .Where(vendor => vendor.Email != null && EF.Functions.Like(vendor.Email, "%@%") && vendor.ActiveStatus == 1);
 
-            // Apply in-memory filtering for Email containing '@'
-            vendors = vendors.Where(vendor => vendor.Email != null && vendor.Email.Contains('@')).ToList();
-
-            // Apply in-memory filtering for Mfgs
+            // Apply filtering for Mfgs
             if (mfg.Trim().ToLower() != "all")
             {
-                vendors = vendors.Where(vendor =>
-                    vendor.Mfgs != null &&
-                    vendor.Mfgs.ToLower().Contains(mfg.Trim().ToLower())
-                ).ToList();
+                var mfgLower = mfg.Trim().ToLower();
+                query = query.Where(vendor => vendor.Mfgs != null && EF.Functions.Like(vendor.Mfgs.ToLower(), $"%{mfgLower}%"));
             }
 
-            // Apply in-memory filtering for ContactType
-            if (anc == false && fne == false)
+            // Apply filtering for ContactType
+            if (!anc && !fne)
             {
-                vendors = vendors.Where(vendor =>
-                    (vendor.ContactType ?? string.Empty).Trim() == "Reseller" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "FNE Vendor" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "OEM" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Ancillary Vendor" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Central Office" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Service Vendor"
-                ).ToList();
+                query = query.Where(vendor =>
+                    vendor.ContactType == "Reseller" ||
+                    vendor.ContactType == "FNE Vendor" ||
+                    vendor.ContactType == "OEM" ||
+                    vendor.ContactType == "Ancillary Vendor" ||
+                    vendor.ContactType == "Central Office" ||
+                    vendor.ContactType == "Service Vendor"
+                );
             }
-            else if (anc == true)
+            else if (anc)
             {
-                vendors = vendors.Where(vendor =>
-                    (vendor.ContactType ?? string.Empty).Trim() == "OEM" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Ancillary Vendor" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Central Office" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "Service Vendor"
-                ).ToList();
+                query = query.Where(vendor =>
+                    vendor.ContactType == "OEM" ||
+                    vendor.ContactType == "Ancillary Vendor" ||
+                    vendor.ContactType == "Central Office" ||
+                    vendor.ContactType == "Service Vendor"
+                );
             }
-            else if (fne == true)
+            else if (fne)
             {
-                vendors = vendors.Where(vendor =>
-                    (vendor.ContactType ?? string.Empty).Trim() == "Reseller" ||
-                    (vendor.ContactType ?? string.Empty).Trim() == "FNE Vendor"
-                ).ToList();
+                query = query.Where(vendor =>
+                    vendor.ContactType == "Reseller" ||
+                    vendor.ContactType == "FNE Vendor"
+                );
             }
 
-            var queryForVendors = vendors.Select(vendor => new MassMailerVendor
-            {
-                Id = vendor.Id,
-                Contact = vendor.Contact ?? string.Empty,
-                Email = vendor.Email ?? string.Empty,
-                Company = vendor.Company ?? string.Empty,
-                MainVendor = vendor.MainVendor
-            }).OrderBy(vendor => vendor.Company).ToList();
+            // Execute the query and transform the result to MassMailerVendor asynchronously
+            var result = await query
+                .Select(vendor => new MassMailerVendor
+                {
+                    Id = vendor.Id,
+                    Contact = vendor.Contact ?? string.Empty,
+                    Email = vendor.Email ?? string.Empty,
+                    Company = vendor.Company ?? string.Empty,
+                    MainVendor = vendor.MainVendor
+                })
+                .OrderBy(vendor => vendor.Company) // Sort by Company
+                .ToListAsync();
 
-            return Ok(queryForVendors);
+            return Ok(result);
         }
+
+
     }
 }
