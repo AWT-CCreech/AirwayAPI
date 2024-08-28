@@ -71,13 +71,11 @@ namespace AirwayAPI.Controllers
         [HttpGet("GetAccountNumbers")]
         public async Task<IActionResult> GetAccountNumbers()
         {
-            var accounts = await _context.OpenSoreports
-                                          .Select(a => new { a.AccountNo })
-                                          .Distinct()
-                                          .ToListAsync();
-
-            // Sort the account numbers explicitly after fetching distinct values
-            var sortedAccounts = accounts.OrderBy(a => a.AccountNo).ToList();
+            var sortedAccounts = await _context.OpenSoreports
+                                                .Select(a => new { a.AccountNo })
+                                                .Distinct()
+                                                .OrderBy(a => a.AccountNo) // Sorting is done in the database
+                                                .ToListAsync();
 
             return Ok(sortedAccounts);
         }
