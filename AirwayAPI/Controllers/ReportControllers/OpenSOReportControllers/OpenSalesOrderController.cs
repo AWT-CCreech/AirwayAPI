@@ -42,22 +42,22 @@ namespace AirwayAPI.Controllers
             // Apply filters
             if (!string.IsNullOrEmpty(soNum))
             {
-                query = query.Where(o => o.Sonum.Contains(soNum));
+                query = query.Where(o => EF.Functions.Like(o.Sonum, $"%{soNum}%"));
             }
 
             if (!string.IsNullOrEmpty(poNum))
             {
-                query = query.Where(o => o.Ponum.Contains(poNum));
+                query = query.Where(o => EF.Functions.Like(o.Ponum, $"%{poNum}%"));
             }
 
             if (!string.IsNullOrEmpty(custPO))
             {
-                query = query.Where(o => o.CustPo.Contains(custPO));
+                query = query.Where(o => EF.Functions.Like(o.CustPo, $"%{custPO}%"));
             }
 
             if (!string.IsNullOrEmpty(partNum))
             {
-                query = query.Where(o => o.ItemNum.Contains(partNum));
+                query = query.Where(o => EF.Functions.Like(o.ItemNum, $"%{partNum}%"));
             }
 
             if (reqDateStatus == "Late")
@@ -89,11 +89,11 @@ namespace AirwayAPI.Controllers
             {
                 if (chkExcludeCo)
                 {
-                    query = query.Where(o => !o.CustomerName.Contains(customer));
+                    query = query.Where(o => !EF.Functions.Like(o.CustomerName, $"%{customer}%"));
                 }
                 else
                 {
-                    query = query.Where(o => o.CustomerName.Contains(customer));
+                    query = query.Where(o => EF.Functions.Like(o.CustomerName, $"%{customer}%"));
                 }
             }
 
@@ -111,6 +111,7 @@ namespace AirwayAPI.Controllers
                 query = query.Where(o => o.AllHere == true);
             }
 
+            // Fetch the sales orders asynchronously
             var salesOrders = await query
                 .Select(o => new
                 {
@@ -131,43 +132,43 @@ namespace AirwayAPI.Controllers
                     o.QtyReceived,
                     o.LeftToShip,
                     // Retrieve the latest PO Log entry
-                    PoLog = (
-                        from poLog in _context.TrkPologs
-                        join poNote in _context.TrkPonotes on poLog.Ponum equals poNote.Ponum.ToString()
-                        where poLog.Ponum == o.Ponum
-                        orderby poNote.EntryDate descending
-                        select new
-                        {
-                            poLog.Id,
-                            poNote.EnteredBy,
-                            poNote.EntryDate
-                        }
-                    ).FirstOrDefault(),
+                    PoLog = _context.TrkPologs
+                            .Where(poLog => poLog.Ponum == o.Ponum)
+                            .Join(_context.TrkPonotes,
+                                  poLog => poLog.Ponum,
+                                  poNote => poNote.Ponum.ToString(),
+                                  (poLog, poNote) => new
+                                  {
+                                      poLog.Id,
+                                      poNote.EnteredBy,
+                                      poNote.EntryDate
+                                  })
+                            .OrderByDescending(poNote => poNote.EntryDate)
+                            .FirstOrDefault(),
                     notes = _context.TrkSonotes
                         .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
-                        .Select(n => new
-                        {
-                            n.Notes,
-                            n.EntryDate,
-                            n.EnteredBy,
-                            n.ContactId,
-                            ContactName = _context.CamContacts
-                                            .Where(c => c.Id == n.ContactId)
-                                            .Select(c => c.Contact)
-                                            .FirstOrDefault() 
-                        })
+                        .Join(_context.CamContacts,
+                              n => n.ContactId,
+                              c => c.Id,
+                              (n, c) => new
+                              {
+                                  n.Notes,
+                                  n.EntryDate,
+                                  n.EnteredBy,
+                                  n.ContactId,
+                                  ContactName = c.Contact
+                              })
                         .ToList()
                 })
                 .OrderBy(o => o.Sonum)
-                .ToListAsync();
-
+                .ToListAsync(); // Changed to ToListAsync()
 
             if (chkGroupBySo)
             {
                 var groupedOrders = salesOrders
                     .GroupBy(o => o.Sonum)
                     .Select(g => g.First()) // Take the first order from each group
-                    .ToList();
+                    .ToList(); // This remains synchronous as it's after fetching data
 
                 return Ok(groupedOrders);
             }
