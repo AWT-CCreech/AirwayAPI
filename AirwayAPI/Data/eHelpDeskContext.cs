@@ -80,11 +80,15 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<TrkPonote> TrkPonotes { get; set; }
 
+    public virtual DbSet<TrkRwImItem> TrkRwImItems { get; set; }
+
     public virtual DbSet<TrkRwPoheader> TrkRwPoheaders { get; set; }
 
     public virtual DbSet<TrkRwSodetail> TrkRwSodetails { get; set; }
 
     public virtual DbSet<TrkRwSoheader> TrkRwSoheaders { get; set; }
+
+    public virtual DbSet<TrkRwvendor> TrkRwvendors { get; set; }
 
     public virtual DbSet<TrkSonote> TrkSonotes { get; set; }
 
@@ -1720,6 +1724,35 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("PONum");
         });
 
+        modelBuilder.Entity<TrkRwImItem>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkRwImItem");
+
+            entity.HasIndex(e => e.ItemNum, "IX_trkRwImItemNum").HasFillFactor(80);
+
+            entity.Property(e => e.AltPartNum).HasMaxLength(50);
+            entity.Property(e => e.Category).HasMaxLength(20);
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasColumnName("CompanyID");
+            entity.Property(e => e.ItemClassId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("ItemClassID");
+            entity.Property(e => e.ItemClassification).HasDefaultValueSql("((0))");
+            entity.Property(e => e.ItemDesc).HasMaxLength(255);
+            entity.Property(e => e.ItemNum).HasMaxLength(50);
+            entity.Property(e => e.LastPurchAmt).HasColumnType("money");
+            entity.Property(e => e.LastSaleAmt).HasColumnType("money");
+            entity.Property(e => e.ListPrice).HasMaxLength(20);
+            entity.Property(e => e.Mfg).HasMaxLength(50);
+            entity.Property(e => e.ProductCode).HasMaxLength(10);
+            entity.Property(e => e.SubType).HasMaxLength(15);
+            entity.Property(e => e.UnitCost).HasColumnType("money");
+            entity.Property(e => e.VendorNum).HasMaxLength(25);
+        });
+
         modelBuilder.Entity<TrkRwPoheader>(entity =>
         {
             entity
@@ -1827,6 +1860,41 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("RMANum");
             entity.Property(e => e.ShipToNum).HasMaxLength(16);
             entity.Property(e => e.Terms).HasMaxLength(25);
+        });
+
+        modelBuilder.Entity<TrkRwvendor>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkRWVendors");
+
+            entity.Property(e => e.Address1)
+                .HasMaxLength(75)
+                .IsUnicode(false);
+            entity.Property(e => e.Address2)
+                .HasMaxLength(75)
+                .IsUnicode(false);
+            entity.Property(e => e.Address3)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Address4)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.City).HasMaxLength(50);
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("(N'AIR')")
+                .HasColumnName("CompanyID");
+            entity.Property(e => e.Country).HasMaxLength(50);
+            entity.Property(e => e.State).HasMaxLength(50);
+            entity.Property(e => e.Text2).HasMaxLength(16);
+            entity.Property(e => e.VendorName)
+                .HasMaxLength(255)
+                .IsUnicode(false);
+            entity.Property(e => e.VendorNum)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Zip).HasMaxLength(12);
         });
 
         modelBuilder.Entity<TrkSonote>(entity =>
