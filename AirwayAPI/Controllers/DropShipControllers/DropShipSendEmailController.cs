@@ -13,17 +13,17 @@ namespace AirwayAPI.Controllers.DropShipControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SendDropShipEmailController : ControllerBase
+    public class DropShipSendEmailController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
 
-        public SendDropShipEmailController(eHelpDeskContext context)
+        public DropShipSendEmailController(eHelpDeskContext context)
         {
             _context = context;
         }
 
         [HttpPost]
-        public async Task<ActionResult> SendDropShipEmailAsync([FromBody] DropShipEmailInput input)
+        public async Task<ActionResult> DropShipSendEmailAsync([FromBody] DropShipEmailInput input)
         {
             if (input == null || string.IsNullOrWhiteSpace(input.SenderUserName) || string.IsNullOrWhiteSpace(input.Password) ||
                 input.RecipientEmails == null || input.RecipientNames == null)
