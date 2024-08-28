@@ -127,7 +127,7 @@ namespace AirwayAPI.Controllers.MasterSearch
         [HttpGet("Contacts")]
         public async Task<ActionResult<MasterSearchContact[]>> GetContacts([FromQuery] string searchValue, [FromQuery] bool active)
         {
-            var query = _context.CamContacts.Where(cc => cc.Contact.Trim().ToLower().Contains(searchValue.Trim().ToLower()));
+            var query = _context.CamContacts.Where(cc => cc.Contact != null && cc.Contact.Trim().ToLower().Contains(searchValue.Trim().ToLower()));
             if (active)
             {
                 query = query.Where(cc => cc.ActiveStatus == 1);
@@ -136,10 +136,10 @@ namespace AirwayAPI.Controllers.MasterSearch
             var contacts = await query.Select(cc => new MasterSearchContact
             {
                 Id = cc.Id,
-                Contact = cc.Contact,
-                Company = cc.Company,
-                State = cc.State,
-                PhoneMain = cc.PhoneMain,
+                Contact = cc.Contact ?? "",
+                Company = cc.Company ?? "",
+                State = cc.State ?? "",
+                PhoneMain = cc.PhoneMain ?? "",
                 ActiveStatus = cc.ActiveStatus == 1
             }).ToListAsync();
 
@@ -295,28 +295,28 @@ namespace AirwayAPI.Controllers.MasterSearch
                                            from lo2 in leftOuter2.DefaultIfEmpty()
                                            join qt in _context.QtQuotes on re.EventId equals qt.EventId into leftOuter3
                                            from lo3 in leftOuter3.DefaultIfEmpty()
-                                           where (input.PartNo && (er.PartNum.ToLower().Contains(search)
-                                                || er.AltPartNum.ToLower().Contains(search)))
-                                                || (input.PartDesc && er.PartDesc.ToLower().Contains(search))
-                                                || (input.Company && cc.Company.ToLower().Contains(search))
+                                           where (input.PartNo && ((er.PartNum ?? string.Empty).ToLower().Contains(search)
+                                                || (er.AltPartNum ?? string.Empty).ToLower().Contains(search)))
+                                                || (input.PartDesc && (er.PartDesc ?? string.Empty).ToLower().Contains(search))
+                                                || (input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search))
                                                 || (input.ID && search.All(char.IsNumber) && re.EventId.ToString() == search)
                                                 || (input.ID && search.All(char.IsNumber) && input.PartNo && re.EventId.ToString().Contains(search))
-                                                || (input.SONo && er.SalesOrderNum.ToLower().Contains(search))
-                                                || (input.PONo && lo1.Ponum.ToLower().Contains(search))
-                                                || (input.InvNo && lo2.InvoiceNo.ToString().Contains(search))
-                                                || (input.Mfg && re.EntryDate > DateTime.Now.AddDays(-730) && re.Manufacturer.ToLower().Contains(search))
+                                                || (input.SONo && (er.SalesOrderNum ?? string.Empty).ToLower().Contains(search))
+                                                || (input.PONo && (lo1.Ponum ?? string.Empty).ToLower().Contains(search))
+                                                || (input.InvNo && lo2 != null && lo2.InvoiceNo.HasValue && lo2.InvoiceNo.Value.ToString().Contains(search)) // Ensure lo2 and lo2.InvoiceNo are not null
+                                                || (input.Mfg && re.EntryDate > DateTime.Now.AddDays(-730) && (re.Manufacturer ?? string.Empty).ToLower().Contains(search))
                                            select new
                                            {
                                                re.EventId,
                                                re.ContactId,
                                                re.SoldOrLost,
                                                re.EnteredBy,
-                                               re.Manufacturer,
+                                               Manufacturer = re.Manufacturer ?? string.Empty,
                                                re.Platform,
                                                re.EntryDate,
-                                               cc.Contact,
-                                               cc.Company,
-                                               us.Uname,
+                                               Contact = cc.Contact ?? string.Empty,
+                                               Company = cc.Company ?? string.Empty,
+                                               Uname = us.Uname ?? string.Empty,
                                                QuoteId = (int?)lo3.QuoteId,
                                                Version = (int?)lo3.Version
                                            }).Distinct().ToListAsync();
@@ -334,6 +334,7 @@ namespace AirwayAPI.Controllers.MasterSearch
                 return Ok(Array.Empty<SellOppEvent>());
             }
         }
+
 
         #endregion
     }

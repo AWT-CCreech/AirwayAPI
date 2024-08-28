@@ -42,22 +42,22 @@ namespace AirwayAPI.Controllers
             // Apply filters
             if (!string.IsNullOrEmpty(soNum))
             {
-                query = query.Where(o => EF.Functions.Like(o.Sonum, $"%{soNum}%"));
+                query = query.Where(o => o.Sonum != null && EF.Functions.Like(o.Sonum, $"%{soNum}%"));
             }
 
             if (!string.IsNullOrEmpty(poNum))
             {
-                query = query.Where(o => EF.Functions.Like(o.Ponum, $"%{poNum}%"));
+                query = query.Where(o => o.Ponum != null && EF.Functions.Like(o.Ponum, $"%{poNum}%"));
             }
 
             if (!string.IsNullOrEmpty(custPO))
             {
-                query = query.Where(o => EF.Functions.Like(o.CustPo, $"%{custPO}%"));
+                query = query.Where(o => o.CustPo != null && EF.Functions.Like(o.CustPo, $"%{custPO}%"));
             }
 
             if (!string.IsNullOrEmpty(partNum))
             {
-                query = query.Where(o => EF.Functions.Like(o.ItemNum, $"%{partNum}%"));
+                query = query.Where(o => o.ItemNum != null && EF.Functions.Like(o.ItemNum, $"%{partNum}%"));
             }
 
             if (reqDateStatus == "Late")
@@ -89,11 +89,11 @@ namespace AirwayAPI.Controllers
             {
                 if (chkExcludeCo)
                 {
-                    query = query.Where(o => !EF.Functions.Like(o.CustomerName, $"%{customer}%"));
+                    query = query.Where(o => o.CustomerName != null && !EF.Functions.Like(o.CustomerName, $"%{customer}%"));
                 }
                 else
                 {
-                    query = query.Where(o => EF.Functions.Like(o.CustomerName, $"%{customer}%"));
+                    query = query.Where(o => o.CustomerName != null && EF.Functions.Like(o.CustomerName, $"%{customer}%"));
                 }
             }
 

@@ -26,8 +26,10 @@ namespace AirwayAPI.Controllers
         {
             var reps = await (from u in _context.Users
                               join d in _context.Departments on u.DeptId equals d.Id
-                              where d.Id == 2 && u.ActiveSales == 1 && u.Email.Length > 1 && !u.Uname.Contains("house")
-                                    || u.Uname == "JHerbst"
+                              where d.Id == 2
+                                    && u.ActiveSales == 1
+                                    && (u.Email != null && u.Email.Length > 1)
+                                    && (u.Uname == "JHerbst" || (u.Uname != null && !u.Uname.Contains("house")))
                               orderby u.Uname
                               select new
                               {
@@ -39,6 +41,7 @@ namespace AirwayAPI.Controllers
 
             return Ok(reps);
         }
+
 
         [HttpGet("GetSalesTeams")]
         public async Task<IActionResult> GetSalesTeams()
