@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 namespace AirwayAPI.Controllers
 {
     [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class MassMailerVendorsController : ControllerBase
     {
         private readonly eHelpDeskContext _context;

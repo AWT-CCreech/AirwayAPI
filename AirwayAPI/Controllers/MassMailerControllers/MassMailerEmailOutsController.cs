@@ -16,8 +16,8 @@ using Microsoft.AspNetCore.Authorization;
 namespace AirwayAPI.Controllers
 {
     [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class MassMailerEmailOutsController : ControllerBase
     {
         private readonly eHelpDeskContext _context;

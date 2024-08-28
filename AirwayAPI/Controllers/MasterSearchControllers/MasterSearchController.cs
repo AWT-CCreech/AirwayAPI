@@ -8,15 +8,15 @@ using Newtonsoft.Json;
 namespace AirwayAPI.Controllers.MasterSearch
 {
     [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class MasterSearchController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
 
         public MasterSearchController(eHelpDeskContext context)
         {
-            this._context = context;
+            _context = context;
         }
 
         #region BuyOppDetails

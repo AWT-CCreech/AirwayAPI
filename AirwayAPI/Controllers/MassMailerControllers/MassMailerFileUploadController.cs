@@ -5,8 +5,8 @@ using System.Net.Http.Headers;
 namespace AirwayAPI.Controllers
 {
     [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class MassMailerFileUploadController : ControllerBase
     {
         [HttpGet("{username}")]

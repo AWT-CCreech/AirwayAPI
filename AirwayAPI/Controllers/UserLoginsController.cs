@@ -12,8 +12,8 @@ using System.Text;
 
 namespace AirwayAPI.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class UserLoginsController : ControllerBase
     {
         private readonly eHelpDeskContext _context;

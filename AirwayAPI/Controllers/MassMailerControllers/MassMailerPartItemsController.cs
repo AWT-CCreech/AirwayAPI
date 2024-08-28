@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace AirwayAPI.Controllers
 {
     [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class MassMailerPartItemsController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
