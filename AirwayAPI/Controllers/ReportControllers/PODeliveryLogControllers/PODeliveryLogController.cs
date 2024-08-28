@@ -63,7 +63,7 @@ namespace AirwayAPI.Controllers
                             l.SalesRep,
                             l.IssuedBy,
                             v.VendorName,
-                            ItemClassID = i.ItemClassId,
+                            i.ItemClassId,
                             i.AltPartNum,
                             p.Postatus
                         };
@@ -128,11 +128,11 @@ namespace AirwayAPI.Controllers
             }
             if (EquipType == "Ancillary")
             {
-                query = query.Where(l => l.ItemClassID == 23);
+                query = query.Where(l => l.ItemClassId == 23);
             }
             else if (EquipType == "FNE")
             {
-                query = query.Where(l => l.ItemClassID == 24);
+                query = query.Where(l => l.ItemClassId == 24);
             }
 
             var results = await query.OrderBy(l => l.Id).ToListAsync();
