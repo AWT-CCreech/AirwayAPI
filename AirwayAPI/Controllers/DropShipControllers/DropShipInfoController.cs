@@ -1,18 +1,20 @@
 ﻿using AirwayAPI.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Controllers.DropShipControllers
 {
-    [Route("api/[controller]")]
+    [Authorize]
     [ApiController]
+    [Route("api/[controller]")]
     public class DropShipInfoController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
 
         public DropShipInfoController(eHelpDeskContext context)
         {
-            this._context = context;
+            _context = context;
         }
 
         [HttpGet("{poNum}")]

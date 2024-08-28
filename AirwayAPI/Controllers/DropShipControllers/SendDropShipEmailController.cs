@@ -3,21 +3,23 @@ using AirwayAPI.Data;
 using AirwayAPI.Models;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 
 namespace AirwayAPI.Controllers.DropShipControllers
 {
-    [Route("api/[controller]")]
+    [Authorize]
     [ApiController]
+    [Route("api/[controller]")]
     public class SendDropShipEmailController : ControllerBase
     {
         private readonly eHelpDeskContext _context;
 
         public SendDropShipEmailController(eHelpDeskContext context)
         {
-            this._context = context;
+            _context = context;
         }
 
         [HttpPost]
