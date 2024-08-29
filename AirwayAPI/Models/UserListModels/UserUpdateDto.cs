@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Models;
+﻿namespace AirwayAPI.Models.UserListModels;
 
 public class UserUpdateDto
 {

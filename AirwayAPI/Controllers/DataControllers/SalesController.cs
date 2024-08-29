@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.DataControllers
 {
     [Authorize]
     [ApiController]
@@ -28,8 +28,8 @@ namespace AirwayAPI.Controllers
                               join d in _context.Departments on u.DeptId equals d.Id
                               where d.Id == 2
                                     && u.ActiveSales == 1
-                                    && (u.Email != null && u.Email.Length > 1)
-                                    && (u.Uname == "JHerbst" || (u.Uname != null && !u.Uname.Contains("house")))
+                                    && u.Email != null && u.Email.Length > 1
+                                    && (u.Uname == "JHerbst" || u.Uname != null && !u.Uname.Contains("house"))
                               orderby u.Uname
                               select new
                               {

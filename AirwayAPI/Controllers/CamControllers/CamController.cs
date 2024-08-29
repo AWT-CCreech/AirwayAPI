@@ -6,7 +6,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.CamControllers
 {
     [Authorize]
     [ApiController]

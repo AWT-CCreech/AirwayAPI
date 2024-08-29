@@ -1,10 +1,10 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
+using AirwayAPI.Models.MassMailerModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.MassMailerControllers
 {
     [Authorize]
     [ApiController]
@@ -34,7 +34,7 @@ namespace AirwayAPI.Controllers
             {
                 massMailerPartItems[i].MassMailing = false;
             }
-            
+
             await _context.SaveChangesAsync();
 
             return Ok();

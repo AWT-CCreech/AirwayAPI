@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.TrakkerControllers
 {
     [Authorize]
     [ApiController]
@@ -17,7 +17,7 @@ namespace AirwayAPI.Controllers
             _context = context;
         }
 
-        
+
         [HttpGet("Companies")]
         public async Task<IActionResult> GetCompanies()
         {
@@ -29,6 +29,6 @@ namespace AirwayAPI.Controllers
 
             return Ok(companies);
         }
-        
+
     }
 }

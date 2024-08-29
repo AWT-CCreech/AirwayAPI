@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.MassMailerControllers
 {
     [Authorize]
     [ApiController]

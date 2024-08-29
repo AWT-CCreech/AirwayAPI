@@ -12,8 +12,9 @@ using MimeKit.Utils;
 using System.Data;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
+using AirwayAPI.Models.MassMailerModels;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.MassMailerControllers
 {
     [Authorize]
     [ApiController]

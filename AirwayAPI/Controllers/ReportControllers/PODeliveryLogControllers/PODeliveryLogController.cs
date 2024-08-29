@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
 {
     [Authorize]
     [ApiController]
@@ -96,15 +96,15 @@ namespace AirwayAPI.Controllers
             else if (POStatus == "Late")
             {
                 query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 && (
-                            (DateTime.Now > l.ExpectedDelivery && DateTime.Now > l.RequiredDate) ||
-                            (DateTime.Now > l.RequiredDate && l.ExpectedDelivery == null)
+                            DateTime.Now > l.ExpectedDelivery && DateTime.Now > l.RequiredDate ||
+                            DateTime.Now > l.RequiredDate && l.ExpectedDelivery == null
                         ));
             }
             else if (POStatus == "Due w/n 2 Days")
             {
                 query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 && (
-                            (l.ExpectedDelivery >= DateTime.Now && l.ExpectedDelivery <= DateTime.Now.AddDays(2)) ||
-                            (l.RequiredDate >= DateTime.Now && l.RequiredDate <= DateTime.Now.AddDays(2) && l.ExpectedDelivery == null)
+                            l.ExpectedDelivery >= DateTime.Now && l.ExpectedDelivery <= DateTime.Now.AddDays(2) ||
+                            l.RequiredDate >= DateTime.Now && l.RequiredDate <= DateTime.Now.AddDays(2) && l.ExpectedDelivery == null
                         ));
             }
             if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy != "All")

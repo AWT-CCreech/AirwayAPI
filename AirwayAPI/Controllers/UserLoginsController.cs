@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Data;
-using AirwayAPI.Models;
+using AirwayAPI.Models.LoginModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;

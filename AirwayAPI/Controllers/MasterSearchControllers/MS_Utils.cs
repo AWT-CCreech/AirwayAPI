@@ -1,7 +1,8 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
+using AirwayAPI.Models.MasterSearchModels;
 
-namespace AirwayAPI.Controllers.MasterSearch
+namespace AirwayAPI.Controllers.MasterSearchControllers
 {
     public static class MS_Utils
     {
@@ -22,7 +23,7 @@ namespace AirwayAPI.Controllers.MasterSearch
                 Mfg = input.Mfg,
                 SearchBy = input.Uname,
                 SearchDate = DateTime.Now
-    });
+            });
             context.SaveChanges();
         }
     }

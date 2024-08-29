@@ -1,11 +1,11 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
+using AirwayAPI.Models.MasterSearchModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
-namespace AirwayAPI.Controllers.MasterSearch
+namespace AirwayAPI.Controllers.MasterSearchControllers
 {
     [Authorize]
     [ApiController]
@@ -41,10 +41,10 @@ namespace AirwayAPI.Controllers.MasterSearch
                                            join us in _context.Users on be.EventOwner equals us.Id
                                            join es in _context.EquipmentSnapshots on be.EventId equals es.EventId into leftOuter
                                            from lo in leftOuter.DefaultIfEmpty()
-                                           where (input.PartNo && (bd.PartNum ?? string.Empty).ToLower().Contains(search))
-                                               || (input.PartDesc && (bd.PartDesc ?? string.Empty).ToLower().Contains(search))
-                                               || (input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search))
-                                               || (input.ID && search.All(char.IsNumber) && bd.DetailId.ToString() == search)
+                                           where input.PartNo && (bd.PartNum ?? string.Empty).ToLower().Contains(search)
+                                               || input.PartDesc && (bd.PartDesc ?? string.Empty).ToLower().Contains(search)
+                                               || input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search)
+                                               || input.ID && search.All(char.IsNumber) && bd.DetailId.ToString() == search
                                            select new
                                            {
                                                be.EventId,
@@ -92,10 +92,10 @@ namespace AirwayAPI.Controllers.MasterSearch
                                           from lo1 in leftOuter1.DefaultIfEmpty()
                                           join es in _context.EquipmentSnapshots on be.EventId equals es.EventId into leftOuter2
                                           from lo2 in leftOuter2.DefaultIfEmpty()
-                                          where (input.PartNo && (lo1.PartNum ?? string.Empty).ToLower().Contains(search))
-                                              || (input.PartDesc && (lo1.PartDesc ?? string.Empty).ToLower().Contains(search))
-                                              || (input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search))
-                                              || (input.ID && search.All(char.IsNumber) && be.EventId.ToString() == search)
+                                          where input.PartNo && (lo1.PartNum ?? string.Empty).ToLower().Contains(search)
+                                              || input.PartDesc && (lo1.PartDesc ?? string.Empty).ToLower().Contains(search)
+                                              || input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search)
+                                              || input.ID && search.All(char.IsNumber) && be.EventId.ToString() == search
                                           select new
                                           {
                                               be.EventId,
@@ -176,14 +176,14 @@ namespace AirwayAPI.Controllers.MasterSearch
                                                 from lo2 in leftOuter2.DefaultIfEmpty()
                                                 join qt in _context.QtQuotes on re.EventId equals qt.EventId into leftOuter3
                                                 from lo3 in leftOuter3.DefaultIfEmpty()
-                                                where (input.PartNo && ((er.PartNum ?? string.Empty).Contains(search) || (er.AltPartNum ?? string.Empty).Contains(search)))
-                                                   || (input.PartDesc && (er.PartDesc ?? string.Empty).ToLower().Contains(search))
-                                                   || (input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search))
-                                                   || (input.ID && search.All(char.IsNumber) && er.RequestId.ToString() == search)
-                                                   || (input.SONo && (er.SalesOrderNum ?? string.Empty).Contains(search))
-                                                   || (input.PONo && (lo1.Ponum ?? string.Empty).Contains(search))
-                                                   || (input.InvNo && lo2 != null && lo2.InvoiceNo.HasValue && lo2.InvoiceNo.Value.ToString().Contains(search)) // Ensure lo2 and lo2.InvoiceNo are not null
-                                                   || (input.Mfg && (re.EntryDate > DateTime.Now.AddDays(-730) && (re.Manufacturer ?? string.Empty).ToLower().Contains(search)))
+                                                where input.PartNo && ((er.PartNum ?? string.Empty).Contains(search) || (er.AltPartNum ?? string.Empty).Contains(search))
+                                                   || input.PartDesc && (er.PartDesc ?? string.Empty).ToLower().Contains(search)
+                                                   || input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search)
+                                                   || input.ID && search.All(char.IsNumber) && er.RequestId.ToString() == search
+                                                   || input.SONo && (er.SalesOrderNum ?? string.Empty).Contains(search)
+                                                   || input.PONo && (lo1.Ponum ?? string.Empty).Contains(search)
+                                                   || input.InvNo && lo2 != null && lo2.InvoiceNo.HasValue && lo2.InvoiceNo.Value.ToString().Contains(search) // Ensure lo2 and lo2.InvoiceNo are not null
+                                                   || input.Mfg && re.EntryDate > DateTime.Now.AddDays(-730) && (re.Manufacturer ?? string.Empty).ToLower().Contains(search)
                                                 select new
                                                 {
                                                     re.EventId,
@@ -201,7 +201,7 @@ namespace AirwayAPI.Controllers.MasterSearch
                                                     Uname = us.Uname ?? string.Empty,
                                                     re.EntryDate,
                                                     QuoteId = (int?)lo3.QuoteId,
-                                                    Version = (int?)lo3.Version
+                                                    lo3.Version
                                                 }).ToListAsync();
 
                     var results = sellOppDetails
@@ -242,8 +242,8 @@ namespace AirwayAPI.Controllers.MasterSearch
 
                             var equipFound = await _context.CompetitorCalls
                                     .Where(cc => cc.QtyNotAvailable == false && cc.HowMany > 0 && cc.EntryDate > today
-                                        && ((partNum != null && partNum.Length > 0 && cc.PartNum == partNum)
-                                        || (altPartNum != null && altPartNum.Length > 0 && cc.MfgPartNum == altPartNum)))
+                                        && (partNum != null && partNum.Length > 0 && cc.PartNum == partNum
+                                        || altPartNum != null && altPartNum.Length > 0 && cc.MfgPartNum == altPartNum))
                                     .SumAsync(cc => cc.HowMany);
 
                             if (result != null)
@@ -295,16 +295,16 @@ namespace AirwayAPI.Controllers.MasterSearch
                                            from lo2 in leftOuter2.DefaultIfEmpty()
                                            join qt in _context.QtQuotes on re.EventId equals qt.EventId into leftOuter3
                                            from lo3 in leftOuter3.DefaultIfEmpty()
-                                           where (input.PartNo && ((er.PartNum ?? string.Empty).ToLower().Contains(search)
-                                                || (er.AltPartNum ?? string.Empty).ToLower().Contains(search)))
-                                                || (input.PartDesc && (er.PartDesc ?? string.Empty).ToLower().Contains(search))
-                                                || (input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search))
-                                                || (input.ID && search.All(char.IsNumber) && re.EventId.ToString() == search)
-                                                || (input.ID && search.All(char.IsNumber) && input.PartNo && re.EventId.ToString().Contains(search))
-                                                || (input.SONo && (er.SalesOrderNum ?? string.Empty).ToLower().Contains(search))
-                                                || (input.PONo && (lo1.Ponum ?? string.Empty).ToLower().Contains(search))
-                                                || (input.InvNo && lo2 != null && lo2.InvoiceNo.HasValue && lo2.InvoiceNo.Value.ToString().Contains(search)) // Ensure lo2 and lo2.InvoiceNo are not null
-                                                || (input.Mfg && re.EntryDate > DateTime.Now.AddDays(-730) && (re.Manufacturer ?? string.Empty).ToLower().Contains(search))
+                                           where input.PartNo && ((er.PartNum ?? string.Empty).ToLower().Contains(search)
+                                                || (er.AltPartNum ?? string.Empty).ToLower().Contains(search))
+                                                || input.PartDesc && (er.PartDesc ?? string.Empty).ToLower().Contains(search)
+                                                || input.Company && (cc.Company ?? string.Empty).ToLower().Contains(search)
+                                                || input.ID && search.All(char.IsNumber) && re.EventId.ToString() == search
+                                                || input.ID && search.All(char.IsNumber) && input.PartNo && re.EventId.ToString().Contains(search)
+                                                || input.SONo && (er.SalesOrderNum ?? string.Empty).ToLower().Contains(search)
+                                                || input.PONo && (lo1.Ponum ?? string.Empty).ToLower().Contains(search)
+                                                || input.InvNo && lo2 != null && lo2.InvoiceNo.HasValue && lo2.InvoiceNo.Value.ToString().Contains(search) // Ensure lo2 and lo2.InvoiceNo are not null
+                                                || input.Mfg && re.EntryDate > DateTime.Now.AddDays(-730) && (re.Manufacturer ?? string.Empty).ToLower().Contains(search)
                                            select new
                                            {
                                                re.EventId,
@@ -318,7 +318,7 @@ namespace AirwayAPI.Controllers.MasterSearch
                                                Company = cc.Company ?? string.Empty,
                                                Uname = us.Uname ?? string.Empty,
                                                QuoteId = (int?)lo3.QuoteId,
-                                               Version = (int?)lo3.Version
+                                               lo3.Version
                                            }).Distinct().ToListAsync();
 
                 var results = sellOppEvents

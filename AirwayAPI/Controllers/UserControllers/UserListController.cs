@@ -1,10 +1,11 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
+using AirwayAPI.Models.UserListModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.UserControllers
 {
     [Authorize]
     [ApiController]
