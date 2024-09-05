@@ -1,9 +1,11 @@
 using AirwayAPI.Data;
+using AirwayAPI.Services; // Import the TokenService
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +21,6 @@ builder.Services.AddCors(options =>
             policy.AllowAnyHeader()
                   .AllowAnyMethod()
                   .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8");
-            //.AllowCredentials(); // if you need to support credentials
         });
 });
 
@@ -28,6 +29,9 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 }, ServiceLifetime.Transient);
+
+// Register the TokenService for dependency injection
+builder.Services.AddScoped<TokenService>();
 
 // Configure JWT authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -53,14 +57,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
+
+        // Add event handler for token validation failures
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                context.Response.StatusCode = 401;
+                context.Response.ContentType = "application/json";
+                var result = JsonSerializer.Serialize(new { message = "Authentication failed." });
+                context.Response.WriteAsync(result);
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                // Optional: Log successful validation or perform additional checks
+                return Task.CompletedTask;
+            }
+        };
     });
+
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Airway API", Version = "v1" });
-    // Include JWT token in Swagger UI
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -96,21 +118,21 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Airway API v1");
-        c.RoutePrefix = string.Empty; // To serve the Swagger UI at the app's root
+        c.RoutePrefix = string.Empty;
     });
 }
 
-//app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 // Serve static files from wwwroot
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.UseRouting(); // Ensure UseRouting is called before UseCors and UseAuthorization
+app.UseRouting();
 
-app.UseCors("CorsPolicy"); // Apply CORS policy
+app.UseCors("CorsPolicy");
 
-app.UseAuthentication(); // Enable authentication middleware
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Fallback to serve index.html for client-side routing
