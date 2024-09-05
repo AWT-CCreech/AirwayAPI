@@ -1,14 +1,12 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Data;
 using AirwayAPI.Models.LoginModels;
+using AirwayAPI.Models.SecurityModels;
+using AirwayAPI.Services;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 
 namespace AirwayAPI.Controllers
 {
@@ -18,13 +16,16 @@ namespace AirwayAPI.Controllers
     {
         private readonly eHelpDeskContext _context;
         private readonly ILogger<UserLoginsController> _logger;
-        private readonly IConfiguration _configuration;
+        private readonly TokenService _tokenService; // Inject TokenService
 
-        public UserLoginsController(eHelpDeskContext context, ILogger<UserLoginsController> logger, IConfiguration configuration)
+        public UserLoginsController(
+            eHelpDeskContext context,
+            ILogger<UserLoginsController> logger,
+            TokenService tokenService) // Inject TokenService
         {
             _context = context;
             _logger = logger;
-            _configuration = configuration;
+            _tokenService = tokenService; // Assign TokenService
         }
 
         [HttpPost]
@@ -71,15 +72,12 @@ namespace AirwayAPI.Controllers
                 }
 
                 int userid = await GetUserIdAsync(usernameTrimmedLower);
-
-                // Generate JWT token
-                var token = GenerateJwtToken(login.username);
+                var token = _tokenService.GenerateJwtToken(login.username);
 
                 // Re-encrypt the password before sending it back to the client
                 login.password = LoginUtils.encryptPassword(login.password);
                 login.isPasswordEncrypted = true; // Indicate that the password is now encrypted
 
-                // Populate the LoginInfo model with the user data and token
                 login.userid = userid.ToString();
                 login.token = token;
 
@@ -91,33 +89,6 @@ namespace AirwayAPI.Controllers
                 _logger.LogError(ex, "An error occurred during login for user: {Username}", login.username);
                 return StatusCode(500, new { message = "An internal error occurred. Please try again later." });
             }
-        }
-
-        private string GenerateJwtToken(string username)
-        {
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-
-            var keyString = _configuration["Jwt:Key"];
-            if (string.IsNullOrEmpty(keyString))
-            {
-                throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyString));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(30),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private async Task<AuthenticationResult> AuthenticateUserAsync(string username, string password)
@@ -159,13 +130,6 @@ namespace AirwayAPI.Controllers
         {
             Span<byte> buffer = new(new byte[base64.Length]);
             return Convert.TryFromBase64String(base64, buffer, out _);
-        }
-
-        private class AuthenticationResult
-        {
-            public bool IsSuccess { get; private set; }
-            public static AuthenticationResult Success() => new() { IsSuccess = true };
-            public static AuthenticationResult Failure() => new() { IsSuccess = false };
         }
     }
 }
