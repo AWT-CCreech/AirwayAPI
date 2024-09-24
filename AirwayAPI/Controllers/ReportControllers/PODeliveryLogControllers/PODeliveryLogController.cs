@@ -30,12 +30,12 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
             [FromQuery] string? POStatus = "Not Complete",
             [FromQuery] string? EquipType = "All",
             [FromQuery] string? CompanyID = "AIR",
-            [FromQuery] int lstYear = 0)
+            [FromQuery] int YearRange = 0)
         {
-            if (lstYear == 0) lstYear = DateTime.Now.Year;
+            if (YearRange == 0) YearRange = DateTime.Now.Year;
 
-            var date1 = new DateTime(lstYear, 1, 1);
-            var date2 = new DateTime(lstYear, 12, 31);
+            var date1 = new DateTime(YearRange, 1, 1);
+            var date2 = new DateTime(YearRange, 12, 31);
 
             var query = from l in _context.TrkPologs
                         join p in _context.TrkRwPoheaders on l.Ponum equals p.Ponum
@@ -43,7 +43,7 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                         join v in _context.TrkRwvendors on p.VendorNum equals v.VendorNum
                         where l.Deleted == false &&
                               l.IssueDate >= date1 && l.IssueDate <= date2 &&
-                              l.CompanyId == CompanyID
+                              (CompanyID == "All" || l.CompanyId == CompanyID)
                         select new
                         {
                             l.Id,
@@ -65,13 +65,19 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                             v.VendorName,
                             i.ItemClassId,
                             i.AltPartNum,
-                            p.Postatus
+                            p.Postatus,
+                            l.CompanyId
                         };
 
-            // Apply Filters
+            // Apply additional filters
+            if (CompanyID == "All")
+            {
+                query = query.Where(l => l.CompanyId == "AIR" || l.CompanyId == "SOL");
+            }
+
             if (!string.IsNullOrEmpty(PONum))
             {
-                query = query.Where(l => l.Ponum == PONum);
+                query = query.Where(l => l.Ponum.Contains(PONum));
             }
             if (!string.IsNullOrEmpty(SONum))
             {
@@ -79,7 +85,7 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
             }
             if (!string.IsNullOrEmpty(Vendor))
             {
-                query = query.Where(l => l.VendorName == Vendor);
+                query = query.Where(l => l.VendorName.Contains(Vendor));
             }
             if (!string.IsNullOrEmpty(PartNum))
             {
