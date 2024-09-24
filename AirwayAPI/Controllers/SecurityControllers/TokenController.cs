@@ -2,6 +2,7 @@
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 
@@ -31,7 +32,6 @@ namespace AirwayAPI.Controllers.SecurityControllers
                 return BadRequest(new { message = "Invalid token." });
             }
 
-            // Attempt to extract the principal from the token (regardless of its expiration)
             ClaimsPrincipal principal;
             try
             {
@@ -48,6 +48,7 @@ namespace AirwayAPI.Controllers.SecurityControllers
                 return StatusCode(500, new { message = "An error occurred while processing your request." });
             }
 
+            // Check for null principal or identity
             if (principal == null || principal.Identity == null || !principal.Identity.IsAuthenticated)
             {
                 _logger.LogWarning("Invalid token provided. The token does not contain a valid user identity.");
@@ -61,9 +62,22 @@ namespace AirwayAPI.Controllers.SecurityControllers
                 return BadRequest(new { message = "Invalid token or token does not contain a valid username." });
             }
 
+            // Check token expiration and decide if a new token is needed
+            var expirationClaim = principal.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp);
+            if (expirationClaim != null && long.TryParse(expirationClaim.Value, out var exp))
+            {
+                var expirationDate = DateTimeOffset.FromUnixTimeSeconds(exp);
+                var currentDateTime = DateTimeOffset.UtcNow;
+
+                if (expirationDate > currentDateTime.AddMinutes(1)) // Consider fresh if more than 1 minute remains
+                {
+                    _logger.LogInformation("Token is still valid. No need to refresh.");
+                    return Ok(new { token = tokenRefreshRequest.Token });
+                }
+            }
+
             _logger.LogInformation("Token validated successfully. Generating a new token for user: {UserName}", username);
 
-            // Generate new JWT token
             string newToken;
             try
             {
