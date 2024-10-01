@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.DataControllers
+namespace AirwayAPI.Controllers.DataControllers.Analytics
 {
     [Authorize]
     [ApiController]
