@@ -2,9 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
 using System.Linq.Dynamic.Core;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Controllers.CamControllers
 {
@@ -36,7 +34,6 @@ namespace AirwayAPI.Controllers.CamControllers
             {
                 companyId = "SOL";
             }
-
 
             // Sanitize and adjust parameters
             searchText = searchText.Trim();
