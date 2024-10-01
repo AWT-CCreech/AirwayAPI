@@ -56,6 +56,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<RequestPo> RequestPos { get; set; }
 
+    public virtual DbSet<RequestPohistory> RequestPohistories { get; set; }
+
     public virtual DbSet<SellOpCompetitor> SellOpCompetitors { get; set; }
 
     public virtual DbSet<ShorelineUser> ShorelineUsers { get; set; }
@@ -783,6 +785,7 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.ModifiedDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+            entity.Property(e => e.NeedToBuy).HasDefaultValueSql("((0))");
             entity.Property(e => e.NeedToBuyTs)
                 .HasColumnType("datetime")
                 .HasColumnName("NeedToBuyTS");
@@ -971,6 +974,9 @@ public partial class eHelpDeskContext : DbContext
                 .HasDefaultValueSql("((0))")
                 .HasColumnType("money");
             entity.Property(e => e.Category).HasMaxLength(50);
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasColumnName("CompanyID");
             entity.Property(e => e.CustPo)
                 .HasMaxLength(50)
                 .HasDefaultValueSql("('')")
@@ -1435,6 +1441,21 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.RequestId).HasColumnName("RequestID");
         });
 
+        modelBuilder.Entity<RequestPohistory>(entity =>
+        {
+            entity.ToTable("RequestPOHistory");
+
+            entity.Property(e => e.DeliveryDate).HasColumnType("datetime");
+            entity.Property(e => e.EditDate).HasColumnType("datetime");
+            entity.Property(e => e.Poid)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("POID");
+            entity.Property(e => e.Ponum)
+                .HasMaxLength(50)
+                .HasColumnName("PONum");
+            entity.Property(e => e.QtyBought).HasDefaultValueSql("((0))");
+        });
+
         modelBuilder.Entity<SellOpCompetitor>(entity =>
         {
             entity.ToTable("SellOpCompetitor");
@@ -1816,6 +1837,9 @@ public partial class eHelpDeskContext : DbContext
             entity.HasIndex(e => new { e.Sonum, e.ItemNum }, "IX_trkRwSODetail_SOItemNum").HasFillFactor(80);
 
             entity.Property(e => e.AccountTeam).HasMaxLength(20);
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasColumnName("CompanyID");
             entity.Property(e => e.ExtTotal).HasColumnType("money");
             entity.Property(e => e.ItemDesc).HasMaxLength(50);
             entity.Property(e => e.ItemNum).HasMaxLength(20);
@@ -1845,6 +1869,9 @@ public partial class eHelpDeskContext : DbContext
 
             entity.Property(e => e.AccountTeam).HasMaxLength(20);
             entity.Property(e => e.Comments).HasMaxLength(256);
+            entity.Property(e => e.CompanyId)
+                .HasMaxLength(10)
+                .HasColumnName("CompanyID");
             entity.Property(e => e.CustNum).HasMaxLength(16);
             entity.Property(e => e.CustPo)
                 .HasMaxLength(50)
