@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.ReportControllers.OpenSOReportControllers
+namespace AirwayAPI.Controllers.ReportControllers
 {
     [Authorize]
     [ApiController]
@@ -47,9 +47,6 @@ namespace AirwayAPI.Controllers.ReportControllers.OpenSOReportControllers
             {
                 return BadRequest("Note cannot be null");
             }
-
-            // Log the received note for debugging
-            Console.WriteLine($"Received Note: {System.Text.Json.JsonSerializer.Serialize(note)}");
 
             _context.TrkSonotes.Add(note);
             await _context.SaveChangesAsync();
