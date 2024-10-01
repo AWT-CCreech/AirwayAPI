@@ -32,6 +32,10 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 
 // Register the TokenService for dependency injection
 builder.Services.AddScoped<TokenService>();
+// Register the EmailService for dependency injection
+builder.Services.AddScoped<EmailService>();
+// Register IHttpContextAccessor to access HttpContext from service classes
+builder.Services.AddHttpContextAccessor();
 
 // Configure JWT authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
