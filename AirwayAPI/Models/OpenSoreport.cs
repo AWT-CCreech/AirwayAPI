@@ -9,6 +9,8 @@ public partial class OpenSoreport
 
     public string? Sonum { get; set; }
 
+    public string? CompanyId { get; set; }
+
     public DateTime? RequiredDate { get; set; }
 
     public DateTime? OrderDate { get; set; }
