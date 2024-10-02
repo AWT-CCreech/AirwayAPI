@@ -13,110 +13,19 @@ namespace AirwayAPI.Services
     {
         private readonly eHelpDeskContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IConfiguration _configuration;
         private readonly ILogger<EmailService> _logger;
 
-        public EmailService(eHelpDeskContext context, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, ILogger<EmailService> logger)
+        public EmailService(eHelpDeskContext context, IHttpContextAccessor httpContextAccessor, ILogger<EmailService> logger)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;
-            _configuration = configuration;
             _logger = logger;
         }
 
-        private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
-        {
-            try
-            {
-                using (var client = new SmtpClient())
-                {
-                    // Enable detailed logging (for debugging)
-                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-                    await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-
-                    // Authenticate user for sending email
-                    string userEmail;
-                    if (updateDto.UserName.Trim().ToLower() == "lvonderporten")
-                    {
-                        userEmail = "lvonder@airway.com";
-                    }
-                    else
-                    {
-                        userEmail = updateDto.UserName.Trim().ToLower() + "@airway.com";
-                    }
-
-                    try
-                    {
-                        await client.AuthenticateAsync(userEmail, LoginUtils.decryptPassword(updateDto.Password));
-                    }
-                    catch (AuthenticationException authEx)
-                    {
-                        throw new InvalidOperationException($"SMTP Authentication failed: {authEx.Message}");
-                    }
-
-                    var httpContext = _httpContextAccessor.HttpContext;
-                    bool isLocalhost = httpContext!.Request.Host.Host.ToLower() == "localhost" && httpContext.Request.Host.Port == 5001;
-                    var message = new MimeMessage
-                    {
-                        From = { new MailboxAddress("Purchasing Department", userEmail) },
-                        Subject = emailInput.Subject
-                    };
-
-                    // Check if the current host is localhost:3000
-                    if (isLocalhost)
-                    {
-                        // If localhost, send to Chris Creech
-                        message.To.Add(new MailboxAddress("Chris Creech", userEmail));
-                    }
-                    else
-                    {
-                        // Otherwise, send to the sales representative
-                        message.To.Add(new MailboxAddress("Sales Representative", emailInput.ToEmail));
-                    }
-
-                    var bodyBuilder = new BodyBuilder
-                    {
-                        HtmlBody = $@"
-                        <html>
-                        <body>
-                            <div>Sales Order #: {emailInput.SalesOrderNum}</div>
-                            <div>Sales Required Date: {emailInput.SalesRequiredDate}</div>
-                            <div>Delivery Date: {emailInput.DeliveryDate}</div>
-                            <div>Part #: {emailInput.PartNumber}</div>
-                            <div>{(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"Notes: {emailInput.Notes}")}</div>
-                        </body>
-                        </html>"
-                    };
-
-                    message.Body = bodyBuilder.ToMessageBody();
-
-                    try
-                    {
-                        // Send email
-                        await client.SendAsync(message);
-                    }
-                    catch (SmtpCommandException smtpEx)
-                    {
-                        throw new InvalidOperationException($"SMTP command error: {smtpEx.Message}");
-                    }
-                    catch (SmtpProtocolException smtpProtocolEx)
-                    {
-                        throw new InvalidOperationException($"SMTP protocol error: {smtpProtocolEx.Message}");
-                    }
-
-                    await client.DisconnectAsync(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
-            }
-        }
-
-
         public async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
+            _logger.LogInformation("Checking delivery date email conditions for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
+
             try
             {
                 var salesOrder = await _context.QtSalesOrders
@@ -133,11 +42,12 @@ namespace AirwayAPI.Services
                         if (!emailSent)
                         {
                             poLogEntry.DeliveryDateEmail = true;
+                            _logger.LogInformation("Preparing email for delayed delivery of Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
 
                             var salesRep = await _context.Users
                                 .FirstOrDefaultAsync(u => u.Uname == salesOrder.EnteredBy);
 
-                            if (salesRep != null)
+                            if (salesRep != null && salesRep.Email != null)
                             {
                                 try
                                 {
@@ -156,10 +66,12 @@ namespace AirwayAPI.Services
                                             : $"The PO Delivery Date Exceeds the Sales Required Date for Sales Order # {poLogEntry.SalesOrderNum}"
                                     };
 
+                                    _logger.LogInformation("Sending delay notification email to {ToEmail}", salesRep.Email);
                                     await PODetailUpdateSendEmail(emailInput, updateDto);
                                 }
                                 catch (Exception ex)
                                 {
+                                    _logger.LogError(ex, "Error occurred while preparing email data for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
                                     throw new InvalidOperationException("Error preparing email data.", ex);
                                 }
                             }
@@ -169,9 +81,110 @@ namespace AirwayAPI.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
                 throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
             }
         }
 
+        private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
+        {
+            _logger.LogInformation("Attempting to send email for Sales Order {SalesOrderNum} to {ToEmail}", emailInput.SalesOrderNum, emailInput.ToEmail);
+
+            try
+            {
+                using var client = new SmtpClient();
+
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                _logger.LogDebug("Connecting to SMTP server...");
+
+                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
+                _logger.LogInformation("Connected to SMTP server.");
+
+                string userEmail;
+                if (updateDto.UserName.Trim().ToLower() == "lvonderporten")
+                {
+                    userEmail = "lvonder@airway.com";
+                }
+                else
+                {
+                    userEmail = updateDto.UserName.Trim().ToLower() + "@airway.com";
+                }
+
+                try
+                {
+                    _logger.LogInformation("Authenticating as {UserEmail}", userEmail);
+                    await client.AuthenticateAsync(userEmail, LoginUtils.decryptPassword(updateDto.Password));
+                }
+                catch (AuthenticationException authEx)
+                {
+                    _logger.LogError(authEx, "SMTP Authentication failed for {UserEmail}", userEmail);
+                    throw new InvalidOperationException($"SMTP Authentication failed: {authEx.Message}");
+                }
+
+                var httpContext = _httpContextAccessor.HttpContext;
+                bool isLocalhost = httpContext!.Request.Host.Host.ToLower() == "localhost" && httpContext.Request.Host.Port == 5001;
+                var message = new MimeMessage
+                {
+                    From = { new MailboxAddress("Purchasing Department", userEmail) },
+                    Subject = emailInput.Subject
+                };
+
+                if (isLocalhost)
+                {
+                    message.To.Add(new MailboxAddress("Chris Creech", userEmail));
+                    _logger.LogInformation("Sending email to Chris Creech (localhost mode)");
+                }
+                else
+                {
+                    message.To.Add(new MailboxAddress("Sales Representative", emailInput.ToEmail));
+                    _logger.LogInformation("Sending email to Sales Representative {ToEmail}", emailInput.ToEmail);
+                }
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
+                    <html>
+                    <body>
+                        <div>Sales Order #: {emailInput.SalesOrderNum}</div>
+                        <div>Sales Required Date: {emailInput.SalesRequiredDate}</div>
+                        <div>Delivery Date: {emailInput.DeliveryDate}</div>
+                        <div>Part #: {emailInput.PartNumber}</div>
+                        <div>{(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"Notes: {emailInput.Notes}")}</div>
+                    </body>
+                    </html>"
+                };
+
+                if (updateDto.UrgentEmail)
+                {
+                    message.Subject = $"*** YOUR PO FOR {emailInput.CompanyName} IS DELAYED BY {(DateTime.Parse(emailInput.DeliveryDate) - DateTime.Parse(emailInput.SalesRequiredDate)).Days} DAYS ***";
+                }
+
+                message.Body = bodyBuilder.ToMessageBody();
+
+                try
+                {
+                    _logger.LogInformation("Sending email for Sales Order {SalesOrderNum} to {ToEmail}", emailInput.SalesOrderNum, emailInput.ToEmail);
+                    await client.SendAsync(message);
+                }
+                catch (SmtpCommandException smtpEx)
+                {
+                    _logger.LogError(smtpEx, "SMTP command error while sending email");
+                    throw new InvalidOperationException($"SMTP command error: {smtpEx.Message}");
+                }
+                catch (SmtpProtocolException smtpProtocolEx)
+                {
+                    _logger.LogError(smtpProtocolEx, "SMTP protocol error while sending email");
+                    throw new InvalidOperationException($"SMTP protocol error: {smtpProtocolEx.Message}");
+                }
+
+                await client.DisconnectAsync(true);
+                _logger.LogInformation("Email sent successfully and SMTP connection closed.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while sending email.");
+                throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
+            }
+        }
     }
 }
