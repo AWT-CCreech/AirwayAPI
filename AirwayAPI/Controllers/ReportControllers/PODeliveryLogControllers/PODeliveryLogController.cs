@@ -37,60 +37,82 @@ namespace AirwayAPI.Controllers.ReportControllers
             var date1 = new DateTime(YearRange, 1, 1);
             var date2 = new DateTime(YearRange, 12, 31);
 
-            var query = from l in _context.TrkPologs
-                        join p in _context.TrkRwPoheaders on l.Ponum equals p.Ponum
-                        join i in _context.TrkRwImItems on new { l.ItemNum, p.CompanyId } equals new { i.ItemNum, i.CompanyId }
+            // Main query
+            var query = from log in _context.TrkPologs
+                        join p in _context.TrkRwPoheaders on log.Ponum equals p.Ponum
+                        join i in _context.TrkRwImItems on new { log.ItemNum, log.CompanyId } equals new { i.ItemNum, i.CompanyId }
                         join v in _context.TrkRwvendors on p.VendorNum equals v.VendorNum
-                        where l.Deleted == false &&
-                              l.IssueDate >= date1 && l.IssueDate <= date2 &&
-                              (CompanyID == "All" || l.CompanyId == CompanyID)
-                        select new
+
+                        // Left join for SO headers
+                        join so in _context.TrkRwSoheaders on log.SalesOrderNum equals so.OrderNum into soGroup
+                        from so in soGroup.DefaultIfEmpty()
+
+                            // Use let clause to get the latest note
+                        let note = _context.TrkPonotes
+                            .Where(n => n.Ponum.ToString() == log.Ponum)
+                            .OrderByDescending(n => n.EntryDate)
+                            .FirstOrDefault()
+
+                        where log.Deleted == false
+                            && log.IssueDate >= date1 && log.IssueDate <= date2
+                            && (CompanyID == "All" || log.CompanyId == CompanyID)
+
+                        select new PODeliveryLogSearchResult
                         {
-                            l.Id,
-                            l.Ponum,
-                            l.IssueDate,
-                            l.ItemNum,
-                            l.QtyOrdered,
-                            l.QtyReceived,
-                            l.ReceiverNum,
-                            l.Notes,
-                            NoteEditDate = l.NoteEditDate ?? "",
-                            l.RequiredDate,
-                            l.DateDelivered,
-                            l.EditDate,
-                            l.ExpectedDelivery,
-                            l.SalesOrderNum,
-                            l.SalesRep,
-                            l.IssuedBy,
-                            v.VendorName,
-                            i.ItemClassId,
-                            i.AltPartNum,
-                            p.Postatus,
-                            l.CompanyId
+                            Id = log.Id,
+                            Ponum = log.Ponum ?? "",
+                            IssueDate = log.IssueDate,
+                            ItemNum = log.ItemNum ?? "",
+                            QtyOrdered = log.QtyOrdered,
+                            QtyReceived = log.QtyReceived,
+                            ReceiverNum = log.ReceiverNum,
+                            Notes = note != null ? "YES" : "NO",
+                            NoteEditDate = note != null && note.EntryDate.HasValue
+                                ? note.EntryDate.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                                : null,
+                            PORequiredDate = log.RequiredDate,
+                            DateDelivered = log.DateDelivered,
+                            EditDate = log.EditDate,
+                            ExpectedDelivery = log.ExpectedDelivery,
+                            SalesOrderNum = log.SalesOrderNum ?? "",
+                            IssuedBy = log.IssuedBy ?? "",
+                            VendorName = v.VendorName ?? "",
+                            ItemClassId = i.ItemClassId,
+                            AltPartNum = i.AltPartNum ?? "",
+                            Postatus = p.Postatus,
+                            CompanyId = log.CompanyId ?? "",
+                            SalesRep = log.SalesRep ?? "",
+                            CustomerName = so.CustomerName ?? "",
+                            SORequiredDate = so.RequiredDate
                         };
 
-            // Apply additional filters
-            if (CompanyID == "All")
-            {
-                query = query.Where(l => l.CompanyId == "AIR" || l.CompanyId == "SOL");
-            }
-
+            // Apply filtering based on user input
             if (!string.IsNullOrEmpty(PONum))
             {
                 query = query.Where(l => l.Ponum.Contains(PONum));
             }
+
             if (!string.IsNullOrEmpty(SONum))
             {
                 query = query.Where(l => l.SalesOrderNum.Contains(SONum));
             }
+
             if (!string.IsNullOrEmpty(Vendor))
             {
                 query = query.Where(l => l.VendorName.Contains(Vendor));
             }
+
             if (!string.IsNullOrEmpty(PartNum))
             {
                 query = query.Where(l => l.ItemNum.Contains(PartNum));
             }
+
+            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep != "All")
+            {
+                query = query.Where(l => l.SalesRep == xSalesRep);
+            }
+
+            // PO Status Filtering
             if (POStatus == "Not Complete")
             {
                 query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1);
@@ -101,26 +123,22 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
             else if (POStatus == "Late")
             {
-                query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 && (
-                            DateTime.Now > l.ExpectedDelivery && DateTime.Now > l.RequiredDate ||
-                            DateTime.Now > l.RequiredDate && l.ExpectedDelivery == null
-                        ));
+                query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
+                    ((DateTime.Now > l.ExpectedDelivery && DateTime.Now > l.PORequiredDate) ||
+                    (DateTime.Now > l.PORequiredDate && l.ExpectedDelivery == null)));
             }
             else if (POStatus == "Due w/n 2 Days")
             {
-                query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 && (
-                            l.ExpectedDelivery >= DateTime.Now && l.ExpectedDelivery <= DateTime.Now.AddDays(2) ||
-                            l.RequiredDate >= DateTime.Now && l.RequiredDate <= DateTime.Now.AddDays(2) && l.ExpectedDelivery == null
-                        ));
+                query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
+                    ((l.ExpectedDelivery >= DateTime.Now && l.ExpectedDelivery <= DateTime.Now.AddDays(2)) ||
+                    (l.PORequiredDate >= DateTime.Now && l.PORequiredDate <= DateTime.Now.AddDays(2) && l.ExpectedDelivery == null)));
             }
+
             if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy != "All")
             {
                 query = query.Where(l => l.IssuedBy == IssuedBy);
             }
-            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep != "All")
-            {
-                query = query.Where(l => l.SalesRep == xSalesRep);
-            }
+
             if (!string.IsNullOrEmpty(HasNotes))
             {
                 if (HasNotes.ToLower() == "yes")
@@ -132,6 +150,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                     query = query.Where(l => l.Notes == null || l.Notes.Trim().Length == 0);
                 }
             }
+
             if (EquipType == "Ancillary")
             {
                 query = query.Where(l => l.ItemClassId == 23);
@@ -141,7 +160,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 query = query.Where(l => l.ItemClassId == 24);
             }
 
-            var results = await query.OrderBy(l => l.Id).ToListAsync();
+            var results = await query.ToListAsync();
             return Ok(results);
         }
     }
