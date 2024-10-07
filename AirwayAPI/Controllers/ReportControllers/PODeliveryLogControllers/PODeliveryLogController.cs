@@ -26,28 +26,24 @@ namespace AirwayAPI.Controllers.ReportControllers
             [FromQuery] string? IssuedBy,
             [FromQuery] string? SONum,
             [FromQuery] string? xSalesRep,
-            [FromQuery] string? HasNotes,
+            [FromQuery] string? HasNotes = "All",
             [FromQuery] string? POStatus = "Not Complete",
             [FromQuery] string? EquipType = "All",
             [FromQuery] string? CompanyID = "AIR",
-            [FromQuery] int YearRange = 0)
+            [FromQuery] int YearRange = 0
+        )
         {
             if (YearRange == 0) YearRange = DateTime.Now.Year;
 
             var date1 = new DateTime(YearRange, 1, 1);
             var date2 = new DateTime(YearRange, 12, 31);
 
-            // Main query
             var query = from log in _context.TrkPologs
                         join p in _context.TrkRwPoheaders on log.Ponum equals p.Ponum
                         join i in _context.TrkRwImItems on new { log.ItemNum, log.CompanyId } equals new { i.ItemNum, i.CompanyId }
                         join v in _context.TrkRwvendors on p.VendorNum equals v.VendorNum
-
-                        // Left join for SO headers
                         join so in _context.TrkRwSoheaders on log.SalesOrderNum equals so.OrderNum into soGroup
                         from so in soGroup.DefaultIfEmpty()
-
-                            // Use let clause to get the latest note
                         let note = _context.TrkPonotes
                             .Where(n => n.Ponum.ToString() == log.Ponum)
                             .OrderByDescending(n => n.EntryDate)
@@ -66,7 +62,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                             QtyOrdered = log.QtyOrdered,
                             QtyReceived = log.QtyReceived,
                             ReceiverNum = log.ReceiverNum,
-                            Notes = note != null ? "YES" : "NO",
+                            NotesExist = note != null,
                             NoteEditDate = note != null && note.EntryDate.HasValue
                                 ? note.EntryDate.Value.ToString("yyyy-MM-dd HH:mm:ss")
                                 : null,
@@ -81,36 +77,18 @@ namespace AirwayAPI.Controllers.ReportControllers
                             AltPartNum = i.AltPartNum ?? "",
                             Postatus = p.Postatus,
                             CompanyId = log.CompanyId ?? "",
+                            ContactId = log.ContactId,
                             SalesRep = log.SalesRep ?? "",
                             CustomerName = so.CustomerName ?? "",
                             SORequiredDate = so.RequiredDate
                         };
 
             // Apply filtering based on user input
-            if (!string.IsNullOrEmpty(PONum))
-            {
-                query = query.Where(l => l.Ponum.Contains(PONum));
-            }
-
-            if (!string.IsNullOrEmpty(SONum))
-            {
-                query = query.Where(l => l.SalesOrderNum.Contains(SONum));
-            }
-
-            if (!string.IsNullOrEmpty(Vendor))
-            {
-                query = query.Where(l => l.VendorName.Contains(Vendor));
-            }
-
-            if (!string.IsNullOrEmpty(PartNum))
-            {
-                query = query.Where(l => l.ItemNum.Contains(PartNum));
-            }
-
-            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep != "All")
-            {
-                query = query.Where(l => l.SalesRep == xSalesRep);
-            }
+            if (!string.IsNullOrEmpty(PONum)) query = query.Where(l => l.Ponum.Contains(PONum));
+            if (!string.IsNullOrEmpty(SONum)) query = query.Where(l => l.SalesOrderNum.Contains(SONum));
+            if (!string.IsNullOrEmpty(Vendor)) query = query.Where(l => l.VendorName.Contains(Vendor));
+            if (!string.IsNullOrEmpty(PartNum)) query = query.Where(l => l.ItemNum.Contains(PartNum));
+            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep != "All") query = query.Where(l => l.SalesRep == xSalesRep);
 
             // PO Status Filtering
             if (POStatus == "Not Complete")
@@ -134,31 +112,23 @@ namespace AirwayAPI.Controllers.ReportControllers
                     (l.PORequiredDate >= DateTime.Now && l.PORequiredDate <= DateTime.Now.AddDays(2) && l.ExpectedDelivery == null)));
             }
 
-            if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy != "All")
-            {
-                query = query.Where(l => l.IssuedBy == IssuedBy);
-            }
+            if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy != "All") query = query.Where(l => l.IssuedBy == IssuedBy);
 
+            // Updated HasNotes filtering logic
             if (!string.IsNullOrEmpty(HasNotes))
             {
                 if (HasNotes.ToLower() == "yes")
                 {
-                    query = query.Where(l => l.Notes != null && l.Notes.Trim().Length > 0);
+                    query = query.Where(l => l.NotesExist == true); // Check for existence of notes
                 }
                 else if (HasNotes.ToLower() == "no")
                 {
-                    query = query.Where(l => l.Notes == null || l.Notes.Trim().Length == 0);
+                    query = query.Where(l => l.NotesExist == false); // Check for absence of notes
                 }
             }
 
-            if (EquipType == "Ancillary")
-            {
-                query = query.Where(l => l.ItemClassId == 23);
-            }
-            else if (EquipType == "FNE")
-            {
-                query = query.Where(l => l.ItemClassId == 24);
-            }
+            if (EquipType == "ANC") query = query.Where(l => l.ItemClassId == 23);
+            else if (EquipType == "FNE") query = query.Where(l => l.ItemClassId == 24);
 
             var results = await query.ToListAsync();
             return Ok(results);
