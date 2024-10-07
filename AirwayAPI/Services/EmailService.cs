@@ -59,7 +59,7 @@ namespace AirwayAPI.Services
                                         SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
                                         DeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
                                         PartNumber = poLogEntry.ItemNum!,
-                                        Notes = updateDto.Notes ?? "",
+                                        Notes = updateDto.NewNote ?? "",
                                         Urgent = updateDto.UrgentEmail,
                                         Subject = updateDto.UrgentEmail
                                             ? $"*** YOUR PO FOR {salesOrder.ShipToCompanyName} IS DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
@@ -149,7 +149,7 @@ namespace AirwayAPI.Services
                         <div>Sales Required Date: {emailInput.SalesRequiredDate}</div>
                         <div>Delivery Date: {emailInput.DeliveryDate}</div>
                         <div>Part #: {emailInput.PartNumber}</div>
-                        <div>{(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"Notes: {emailInput.Notes}")}</div>
+                        <div>{(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"NewNote: {emailInput.Notes}")}</div>
                     </body>
                     </html>"
                 };
