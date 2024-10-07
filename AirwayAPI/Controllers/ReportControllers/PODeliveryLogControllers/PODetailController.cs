@@ -2,10 +2,10 @@
 using AirwayAPI.Models;
 using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services;
-using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
@@ -25,6 +25,68 @@ namespace AirwayAPI.Controllers.ReportControllers
             _emailService = emailService;
             _logger = logger;
         }
+
+        // GET: api/PODetail/id/{id}
+        [HttpGet("id/{id}")]
+        public async Task<IActionResult> GetPODetailByID(int id)
+        {
+            // Fetch the PO log entry with associated notes based on the provided ID
+            var poLogEntry = await _context.TrkPologs
+                .Where(p => p.Id == id)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Ponum,
+                    p.SalesOrderNum,
+                    p.ItemNum,
+                    p.QtyOrdered,
+                    p.QtyReceived,
+                    p.ReceiverNum,
+                    p.ExpectedDelivery,
+                    p.ContactId,
+                    Notes = _context.TrkPonotes
+                        .Where(n => n.Ponum.ToString() == p.Ponum)
+                        .OrderByDescending(n => n.EntryDate)
+                        .Select(n => new
+                        {
+                            n.Notes,
+                            n.EntryDate,
+                            n.EnteredBy
+                        })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            if (poLogEntry == null)
+            {
+                return NotFound("PO log entry not found.");
+            }
+
+            // Map to DTO
+            var poDetailDto = new PODetailUpdateDto
+            {
+                Id = poLogEntry.Id,
+                PONum = poLogEntry.Ponum,
+                SONum = poLogEntry.SalesOrderNum,
+                PartNum = poLogEntry.ItemNum,
+                QtyOrdered = poLogEntry.QtyOrdered,
+                QtyReceived = poLogEntry.QtyReceived,
+                ReceiverNum = poLogEntry.ReceiverNum,
+                NotesList = poLogEntry.Notes
+                    .Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}")
+                    .ToList(),
+                ExpectedDelivery = poLogEntry.ExpectedDelivery,
+                ContactID = poLogEntry.ContactId ?? 0,
+                UserId = null, // Set if you have this information
+                UserName = "",  // Set if you have this information
+                UpdateAllDates = false, // Set as needed
+                UrgentEmail = false // Set as needed
+            };
+
+            return Ok(poDetailDto);
+        }
+
+
 
         // PUT: api/PODetail/{id}
         [HttpPut("{id}")]
@@ -70,6 +132,11 @@ namespace AirwayAPI.Controllers.ReportControllers
                 // Update PO Log entry
                 UpdatePODetailFields(poLogEntry, updateDto);
 
+                // Update additional fields
+                poLogEntry.QtyOrdered = updateDto.QtyOrdered;
+                poLogEntry.QtyReceived = updateDto.QtyReceived;
+                poLogEntry.ReceiverNum = updateDto.ReceiverNum;
+
                 if (expectedDeliveryChanged)
                 {
                     await UpdateRequestPOsAndHistory(poLogEntry, updateDto);
@@ -80,27 +147,10 @@ namespace AirwayAPI.Controllers.ReportControllers
                     await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId!.Value);
                 }
 
-                if (!string.IsNullOrWhiteSpace(updateDto.Notes))
+                // Add new notes
+                if (updateDto.NewNote != null)
                 {
-                    var newNote = new TrkSonote
-                    {
-                        OrderNo = poLogEntry.SalesOrderNum,
-                        PartNo = poLogEntry.ItemNum,
-                        Notes = updateDto.Notes,
-                        EnteredBy = updateDto.UserName,
-                        EntryDate = DateTime.Now,
-                        ModBy = updateDto.UserName,
-                        ModDate = DateTime.Now
-                    };
-
-                    // Add the note to the database
-                    _context.TrkSonotes.Add(newNote);
-
-                    // Insert CAM Activity related to the note
-                    InsertCAMActivity(updateDto.ContactID, poLogEntry.Ponum!, poLogEntry.ItemNum!, updateDto);
-
-                    // Save changes to the context
-                    await _context.SaveChangesAsync();
+                    await AddNewNoteAsync(poLogEntry, updateDto.NewNote, updateDto.UserName);
                 }
 
                 // Send Email if expected delivery date changes and exceeds required date
@@ -122,13 +172,44 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
         }
 
+        private async Task AddNewNoteAsync(TrkPolog poLogEntry, string note, string enteredBy)
+        {
+            var newSoNote = new TrkSonote
+            {
+                OrderNo = poLogEntry.SalesOrderNum,
+                PartNo = poLogEntry.ItemNum,
+                Notes = note, // Assuming this is the correct property
+                EnteredBy = enteredBy,
+                EntryDate = DateTime.Now,
+                ModBy = enteredBy,
+                ModDate = DateTime.Now
+            };
+
+            var newPoNote = new TrkPonote
+            {
+                Ponum = int.TryParse(poLogEntry.Ponum, out int parsedPonum) ? parsedPonum : (int?)null,
+                EnteredBy = enteredBy,
+                EntryDate = DateTime.Now,
+                Notes = note
+            };
+
+
+            // Add the note to the database
+            await _context.TrkSonotes.AddAsync(newSoNote);
+
+            await _context.TrkPonotes.AddAsync(newPoNote);
+
+            // Insert CAM Activity related to the note
+            InsertCAMActivity(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, poLogEntry.ItemNum!, note, enteredBy);
+        }
+
         private async Task<int?> GetContactIdIfMissing(string poNum)
         {
-            var contactId = await (from rp in _context.RequestPos
-                                   where rp.Ponum == poNum
-                                   orderby rp.ContactId descending
-                                   select rp.ContactId).FirstOrDefaultAsync();
-            return contactId;
+            return await _context.RequestPos
+                .Where(rp => rp.Ponum == poNum)
+                .OrderByDescending(rp => rp.ContactId)
+                .Select(rp => rp.ContactId)
+                .FirstOrDefaultAsync();
         }
 
         private void UpdatePODetailFields(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
@@ -164,6 +245,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                     EnteredBy = updateDto.UserId,
                     EditDate = requestPO.EditDate
                 };
+
                 _context.RequestPohistories.Add(history);
 
                 // Update the RequestPO record
@@ -179,61 +261,44 @@ namespace AirwayAPI.Controllers.ReportControllers
 
         private async Task UpdateAllPODeliveryDates(string poNum, DateTime? expectedDelivery, int userId)
         {
-            try
-            {
-                var poLogs = await _context.TrkPologs
-                    .Where(p => p.Ponum == poNum)
-                    .ToListAsync();
+            var poLogs = await _context.TrkPologs
+                .Where(p => p.Ponum == poNum)
+                .ToListAsync();
 
-                foreach (var poLog in poLogs)
-                {
-                    poLog.ExpectedDelivery = expectedDelivery;
-                    poLog.ExpDelEditDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    poLog.EditDate = DateTime.Now;
-                    poLog.EditedBy = userId;
-                }
-
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
+            foreach (var poLog in poLogs)
             {
-                throw new InvalidOperationException("Error updating all PO delivery dates.", ex);
+                poLog.ExpectedDelivery = expectedDelivery;
+                poLog.ExpDelEditDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                poLog.EditDate = DateTime.Now;
+                poLog.EditedBy = userId;
             }
+
+            await _context.SaveChangesAsync();
         }
 
-        private void InsertCAMActivity(int contactId, string poNum, string itemNum, PODetailUpdateDto updateDto)
+        private void InsertCAMActivity(int contactId, string poNum, string itemNum, string note, string enteredBy)
         {
-            try
+            string camNote = $"OPEN PO UPDATE FOR PO#{poNum}: {note}";
+
+            var camActivity = new CamActivity
             {
-                string camNote = $"OPEN PO UPDATE FOR PO# {poNum}\n\n";
+                ContactId = contactId,
+                ActivityOwner = enteredBy,
+                ActivityType = "CallOut",
+                DurationHours = 0, 
+                DurationMins = 0,
+                ProjectCode = "",
+                Notes = camNote,
+                ActivityDate = DateTime.Now,
+                EnteredBy = enteredBy,
+                ModifiedBy = enteredBy,
+                CompletedBy = enteredBy,
+                ModifiedDate = DateTime.Now,
+                CompleteDate = DateTime.Now,
+                ContactOverride = 0,
+            };
 
-                if (updateDto.ExpectedDelivery.HasValue)
-                {
-                    camNote += $"New Del Date: {updateDto.ExpectedDelivery.Value.ToShortDateString()}\n\n";
-                }
-
-                // Add notes
-                camNote += $"Note: {updateDto.Notes}";
-
-                var camActivity = new CamActivity
-                {
-                    ContactId = contactId,
-                    ActivityOwner = updateDto.UserName,
-                    ActivityType = "CallOut",
-                    ProjectCode = "",
-                    Notes = camNote,
-                    ActivityDate = DateTime.Now,
-                    EnteredBy = updateDto.UserName,
-                    ModifiedBy = updateDto.UserName,
-                    CompletedBy = updateDto.UserName,
-                    CompleteDate = DateTime.Now
-                };
-                _context.CamActivities.Add(camActivity);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException("Error inserting CAM activity.", ex);
-            }
+            _context.CamActivities.Add(camActivity);
         }
     }
 }
