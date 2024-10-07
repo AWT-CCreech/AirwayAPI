@@ -1,4 +1,5 @@
-﻿public class PODeliveryLogSearchResult
+﻿using AirwayAPI.Models;
+public class PODeliveryLogSearchResult
 {
     public int Id { get; set; }
     public string Ponum { get; set; }
@@ -7,7 +8,7 @@
     public int? QtyOrdered { get; set; }
     public int? QtyReceived { get; set; }
     public int? ReceiverNum { get; set; }
-    public string Notes { get; set; }
+    public bool NotesExist { get; set; } 
     public string? NoteEditDate { get; set; }
     public DateTime? PORequiredDate { get; set; }
     public DateTime? DateDelivered { get; set; }
@@ -20,6 +21,7 @@
     public string AltPartNum { get; set; }
     public int? Postatus { get; set; }
     public string CompanyId { get; set; }
+    public int? ContactId { get; set; }
 
     // Sales Order details
     public string CustomerName { get; set; }
