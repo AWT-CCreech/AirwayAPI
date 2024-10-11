@@ -7,10 +7,10 @@
         public string Subject { get; set; }
         public string Body { get; set; }
         public bool Urgent { get; set; }
-        public string SalesOrderNum { get; set; }
+        public string SoNum { get; set; }
         public string CompanyName { get; set; }
         public string SalesRequiredDate { get; set; }
-        public string DeliveryDate { get; set; }
+        public string ExpectedDeliveryDate { get; set; }
         public string PartNumber { get; set; }
         public string Notes { get; set; }
     }
