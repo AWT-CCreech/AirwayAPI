@@ -1,11 +1,9 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
@@ -44,6 +42,14 @@ namespace AirwayAPI.Controllers.ReportControllers
                     p.ReceiverNum,
                     p.ExpectedDelivery,
                     p.ContactId,
+                    p.IssuedBy,
+                    p.DateDelivered,
+                    p.EditDate,
+                    EditedBy = _context.Users
+                        .Where(u => u.Id == p.EditedBy)
+                        .Select(u => u.Uname)
+                        .FirstOrDefault(),
+                    p.ExpDelEditDate,
                     Notes = _context.TrkPonotes
                         .Where(n => n.Ponum.ToString() == p.Ponum)
                         .OrderByDescending(n => n.EntryDate)
@@ -53,7 +59,16 @@ namespace AirwayAPI.Controllers.ReportControllers
                             n.EntryDate,
                             n.EnteredBy
                         })
-                        .ToList()
+                        .ToList(),
+                    Contact = _context.CamContacts
+                        .Where(c => c.Id == p.ContactId)
+                        .Select(c => new
+                        {
+                            c.Contact,
+                            c.Company,
+                            Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
+                        })
+                        .FirstOrDefault()
                 })
                 .FirstOrDefaultAsync();
 
@@ -62,31 +77,53 @@ namespace AirwayAPI.Controllers.ReportControllers
                 return NotFound("PO log entry not found.");
             }
 
+            // If ContactId is missing, attempt to retrieve it from RequestPos
+            int? contactId = poLogEntry.ContactId;
+            if (!contactId.HasValue && poLogEntry.Ponum != null)
+            {
+                contactId = await GetContactIdIfMissing(poLogEntry.Ponum);
+            }
+
+            // Fetch contact details if ContactId is found in RequestPos
+            var contactDetails = contactId.HasValue
+                ? await _context.CamContacts
+                    .Where(c => c.Id == contactId)
+                    .Select(c => new
+                    {
+                        c.Contact,
+                        c.Company,
+                        Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
+                    })
+                    .FirstOrDefaultAsync()
+                : null;
+
             // Map to DTO
             var poDetailDto = new PODetailUpdateDto
             {
                 Id = poLogEntry.Id,
-                PONum = poLogEntry.Ponum,
-                SONum = poLogEntry.SalesOrderNum,
-                PartNum = poLogEntry.ItemNum,
+                PONum = poLogEntry.Ponum ?? "",
+                SONum = poLogEntry.SalesOrderNum ?? "",
+                PartNum = poLogEntry.ItemNum ?? "",
                 QtyOrdered = poLogEntry.QtyOrdered,
                 QtyReceived = poLogEntry.QtyReceived,
-                ReceiverNum = poLogEntry.ReceiverNum,
+                ReceiverNum = poLogEntry.ReceiverNum ?? 0,
+                ExpectedDelivery = poLogEntry.ExpectedDelivery,
+                ContactID = contactId ?? 0,
+                IssuedBy = poLogEntry.IssuedBy ?? "",
+                DateDelivered = poLogEntry.DateDelivered,
+                EditDate = poLogEntry.EditDate,
+                EditedBy = poLogEntry.EditedBy,
+                ExpDelEditDate = poLogEntry.ExpDelEditDate ?? "",
                 NotesList = poLogEntry.Notes
                     .Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}")
                     .ToList(),
-                ExpectedDelivery = poLogEntry.ExpectedDelivery,
-                ContactID = poLogEntry.ContactId ?? 0,
-                UserId = null, // Set if you have this information
-                UserName = "",  // Set if you have this information
-                UpdateAllDates = false, // Set as needed
-                UrgentEmail = false // Set as needed
+                ContactName = contactDetails?.Contact ?? "PLEASE UPDATE",
+                Company = contactDetails?.Company ?? "",
+                Phone = contactDetails?.Phone ?? ""
             };
 
             return Ok(poDetailDto);
         }
-
-
 
         // PUT: api/PODetail/{id}
         [HttpPut("{id}")]
@@ -103,18 +140,20 @@ namespace AirwayAPI.Controllers.ReportControllers
                 return NotFound("PO log entry not found.");
             }
 
-            // If ContactID is not provided, retrieve from RequestPOs
-            if (updateDto.ContactID == 0)
+            // Retrieve SONum if not provided
+            if (string.IsNullOrEmpty(updateDto.SONum))
             {
-                var contactId = await GetContactIdIfMissing(updateDto.PONum);
-                if (contactId.HasValue)
-                {
-                    updateDto.ContactID = contactId.Value;
-                }
-                else
-                {
-                    return BadRequest("Contact ID is missing and could not be found in RequestPOs.");
-                }
+                var retrievedSONum = await _context.EquipmentRequests
+                    .Where(r => r.PartNum == poLogEntry.ItemNum)
+                    .Join(_context.RequestPos,
+                          r => r.RequestId,
+                          p => p.RequestId,
+                          (r, p) => new { p.Ponum, r.SalesOrderNum })
+                    .Where(joined => joined.Ponum == updateDto.PONum)
+                    .Select(joined => joined.SalesOrderNum)
+                    .FirstOrDefaultAsync();
+
+                updateDto.SONum = retrievedSONum ?? updateDto.SONum;
             }
 
             // Ensure ExpectedDelivery is valid
@@ -132,7 +171,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 // Update PO Log entry
                 UpdatePODetailFields(poLogEntry, updateDto);
 
-                // Update additional fields
+                // Additional field updates
                 poLogEntry.QtyOrdered = updateDto.QtyOrdered;
                 poLogEntry.QtyReceived = updateDto.QtyReceived;
                 poLogEntry.ReceiverNum = updateDto.ReceiverNum;
@@ -147,13 +186,13 @@ namespace AirwayAPI.Controllers.ReportControllers
                     await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId!.Value);
                 }
 
-                // Add new notes
-                if (updateDto.NewNote != null)
+                // Add new notes if present
+                if (!string.IsNullOrEmpty(updateDto.NewNote))
                 {
                     await AddNewNoteAsync(poLogEntry, updateDto.NewNote, updateDto.UserName);
                 }
 
-                // Send Email if expected delivery date changes and exceeds required date
+                // Send Email if conditions are met
                 if (expectedDeliveryChanged)
                 {
                     await _emailService.CheckAndSendDeliveryDateEmail(poLogEntry, updateDto);
@@ -178,7 +217,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             {
                 OrderNo = poLogEntry.SalesOrderNum,
                 PartNo = poLogEntry.ItemNum,
-                Notes = note, // Assuming this is the correct property
+                Notes = note,
                 EnteredBy = enteredBy,
                 EntryDate = DateTime.Now,
                 ModBy = enteredBy,
@@ -227,12 +266,14 @@ namespace AirwayAPI.Controllers.ReportControllers
 
         private async Task UpdateRequestPOsAndHistory(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
-            var requestPOs = await (from re in _context.RequestEvents
-                                    join er in _context.EquipmentRequests on re.EventId equals er.EventId
-                                    join rp in _context.RequestPos on er.RequestId equals rp.RequestId
-                                    where rp.Ponum == poLogEntry.Ponum && er.PartNum == poLogEntry.ItemNum
-                                    select rp)
-                                   .ToListAsync();
+            var requestPOs = await _context.RequestPos
+                .Join(_context.EquipmentRequests,
+                      po => po.RequestId,
+                      req => req.RequestId,
+                      (po, req) => new { po, req })
+                .Where(joined => joined.po.Ponum == poLogEntry.Ponum && joined.req.PartNum == poLogEntry.ItemNum)
+                .Select(joined => joined.po)
+                .ToListAsync();
 
             foreach (var requestPO in requestPOs)
             {
