@@ -24,7 +24,7 @@ namespace AirwayAPI.Services
 
         public async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
-            _logger.LogInformation("Checking delivery date email conditions for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
+            _logger.LogInformation("Checking delivery date email conditions for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
 
             try
             {
@@ -42,7 +42,7 @@ namespace AirwayAPI.Services
                         if (!emailSent)
                         {
                             poLogEntry.DeliveryDateEmail = true;
-                            _logger.LogInformation("Preparing email for delayed delivery of Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
+                            _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
 
                             var salesRep = await _context.Users
                                 .FirstOrDefaultAsync(u => u.Uname == salesOrder.EnteredBy);
@@ -54,10 +54,10 @@ namespace AirwayAPI.Services
                                     var emailInput = new PODetailEmailInput
                                     {
                                         ToEmail = salesRep.Email,
-                                        SalesOrderNum = poLogEntry.SalesOrderNum!,
+                                        SoNum = poLogEntry.SalesOrderNum!,
                                         CompanyName = salesOrder.ShipToCompanyName!,
                                         SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
-                                        DeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
+                                        ExpectedDeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
                                         PartNumber = poLogEntry.ItemNum!,
                                         Notes = updateDto.NewNote ?? "",
                                         Urgent = updateDto.UrgentEmail,
@@ -71,7 +71,7 @@ namespace AirwayAPI.Services
                                 }
                                 catch (Exception ex)
                                 {
-                                    _logger.LogError(ex, "Error occurred while preparing email data for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
+                                    _logger.LogError(ex, "Error occurred while preparing email data for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
                                     throw new InvalidOperationException("Error preparing email data.", ex);
                                 }
                             }
@@ -81,14 +81,14 @@ namespace AirwayAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {SalesOrderNum}", poLogEntry.SalesOrderNum);
+                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
                 throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
             }
         }
 
         private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
         {
-            _logger.LogInformation("Attempting to send email for Sales Order {SalesOrderNum} to {ToEmail}", emailInput.SalesOrderNum, emailInput.ToEmail);
+            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmail);
 
             try
             {
@@ -145,9 +145,9 @@ namespace AirwayAPI.Services
                     HtmlBody = $@"
                     <html>
                     <body>
-                        <div>Sales Order #: {emailInput.SalesOrderNum}</div>
-                        <div>Sales Required Date: {emailInput.SalesRequiredDate}</div>
-                        <div>Delivery Date: {emailInput.DeliveryDate}</div>
+                        <div>SO: {emailInput.SoNum}</div>
+                        <div>SO Required Date: {emailInput.SalesRequiredDate}</div>
+                        <div>Expected Delivery Date: {emailInput.ExpectedDeliveryDate}</div>
                         <div>Part #: {emailInput.PartNumber}</div>
                         <div>{(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"NewNote: {emailInput.Notes}")}</div>
                     </body>
@@ -156,14 +156,14 @@ namespace AirwayAPI.Services
 
                 if (updateDto.UrgentEmail)
                 {
-                    message.Subject = $"*** YOUR PO FOR {emailInput.CompanyName} IS DELAYED BY {(DateTime.Parse(emailInput.DeliveryDate) - DateTime.Parse(emailInput.SalesRequiredDate)).Days} DAYS ***";
+                    message.Subject = $"*** YOUR PO FOR {emailInput.CompanyName} IS DELAYED BY {(DateTime.Parse(emailInput.ExpectedDeliveryDate) - DateTime.Parse(emailInput.SalesRequiredDate)).Days} DAYS ***";
                 }
 
                 message.Body = bodyBuilder.ToMessageBody();
 
                 try
                 {
-                    _logger.LogInformation("Sending email for Sales Order {SalesOrderNum} to {ToEmail}", emailInput.SalesOrderNum, emailInput.ToEmail);
+                    _logger.LogInformation("Sending email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmail);
                     await client.SendAsync(message);
                 }
                 catch (SmtpCommandException smtpEx)
