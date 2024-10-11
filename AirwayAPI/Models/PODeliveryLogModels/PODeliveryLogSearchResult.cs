@@ -14,7 +14,7 @@ public class PODeliveryLogSearchResult
     public DateTime? DateDelivered { get; set; }
     public DateTime? EditDate { get; set; }
     public DateTime? ExpectedDelivery { get; set; }
-    public string SalesOrderNum { get; set; }
+    public string Sonum { get; set; }
     public string IssuedBy { get; set; }
     public string VendorName { get; set; }
     public int? ItemClassId { get; set; }
@@ -27,4 +27,5 @@ public class PODeliveryLogSearchResult
     public string CustomerName { get; set; }
     public DateTime? SORequiredDate { get; set; }
     public string SalesRep { get; set; }
+    public bool IsDropShipment { get; set; }
 }
