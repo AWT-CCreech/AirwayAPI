@@ -239,7 +239,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             await _context.TrkPonotes.AddAsync(newPoNote);
 
             // Insert CAM Activity related to the note
-            InsertCAMActivity(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, poLogEntry.ItemNum!, note, enteredBy);
+            await InsertCAMActivity(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, poLogEntry.ItemNum!, note, enteredBy);
         }
 
         private async Task<int?> GetContactIdIfMissing(string poNum)
@@ -317,7 +317,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             await _context.SaveChangesAsync();
         }
 
-        private void InsertCAMActivity(int contactId, string poNum, string itemNum, string note, string enteredBy)
+        private async Task InsertCAMActivity(int contactId, string poNum, string itemNum, string note, string enteredBy)
         {
             string camNote = $"OPEN PO UPDATE FOR PO#{poNum}: {note}";
 
@@ -339,7 +339,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 ContactOverride = 0,
             };
 
-            _context.CamActivities.Add(camActivity);
+            await _context.CamActivities.AddAsync(camActivity);
         }
     }
 }
