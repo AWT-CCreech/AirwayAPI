@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class TrkRwSodetail
 {
@@ -6,9 +9,9 @@ public partial class TrkRwSodetail
 
     public string? Sonum { get; set; }
 
-    public int? OrderType { get; set; }
-
     public string? CompanyId { get; set; }
+
+    public int? OrderType { get; set; }
 
     public int? ItemLineNo { get; set; }
 

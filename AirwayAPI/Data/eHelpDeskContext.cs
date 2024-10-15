@@ -58,6 +58,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<RequestPohistory> RequestPohistories { get; set; }
 
+    public virtual DbSet<ScanHistory> ScanHistories { get; set; }
+
     public virtual DbSet<SellOpCompetitor> SellOpCompetitors { get; set; }
 
     public virtual DbSet<ShorelineUser> ShorelineUsers { get; set; }
@@ -101,6 +103,10 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<UserPortalMenu> UserPortalMenus { get; set; }
 
     public virtual DbSet<UserPref> UserPrefs { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=AWTSQL19;Database=eHelpDesk;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -976,6 +982,7 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.Category).HasMaxLength(50);
             entity.Property(e => e.CompanyId)
                 .HasMaxLength(10)
+                .HasDefaultValueSql("(N'AIR')")
                 .HasColumnName("CompanyID");
             entity.Property(e => e.CustPo)
                 .HasMaxLength(50)
@@ -1456,6 +1463,94 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.QtyBought).HasDefaultValueSql("((0))");
         });
 
+        modelBuilder.Entity<ScanHistory>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("ScanHistory");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.BinLocation)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.Direction)
+                .HasMaxLength(3)
+                .IsUnicode(false);
+            entity.Property(e => e.HeciCode)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.MnsCompany)
+                .HasMaxLength(50)
+                .HasColumnName("MNS_Company");
+            entity.Property(e => e.MnsInventoried)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("MNS_Inventoried");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(512)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.OrderType)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.PartNo)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PartNo2)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.PartNoClean)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PoNo)
+                .HasMaxLength(15)
+                .IsUnicode(false);
+            entity.Property(e => e.PostId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("PostID");
+            entity.Property(e => e.Rmano)
+                .HasMaxLength(15)
+                .IsUnicode(false)
+                .HasColumnName("RMANo");
+            entity.Property(e => e.RtvRmaNo)
+                .HasMaxLength(25)
+                .IsUnicode(false)
+                .HasComment("ReturnToVendor RMA No");
+            entity.Property(e => e.Rtvid)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("RTVID");
+            entity.Property(e => e.ScanDate).HasColumnType("datetime");
+            entity.Property(e => e.ScannerId)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')")
+                .HasColumnName("ScannerID");
+            entity.Property(e => e.SerialNo)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.SerialNoB)
+                .HasMaxLength(128)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.SoNo)
+                .HasMaxLength(15)
+                .IsUnicode(false);
+            entity.Property(e => e.TrackNo)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.TrkEventId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("TrkEventID");
+            entity.Property(e => e.UserName)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.VendorName)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasDefaultValueSql("('')");
+        });
+
         modelBuilder.Entity<SellOpCompetitor>(entity =>
         {
             entity.ToTable("SellOpCompetitor");
@@ -1772,6 +1867,9 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.SubType).HasMaxLength(15);
             entity.Property(e => e.UnitCost).HasColumnType("money");
             entity.Property(e => e.VendorNum).HasMaxLength(25);
+            entity.Property(e => e.WarehouseId)
+                .HasDefaultValueSql("((24))")
+                .HasColumnName("WarehouseID");
         });
 
         modelBuilder.Entity<TrkRwPoheader>(entity =>
@@ -1841,8 +1939,8 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(10)
                 .HasColumnName("CompanyID");
             entity.Property(e => e.ExtTotal).HasColumnType("money");
-            entity.Property(e => e.ItemDesc).HasMaxLength(50);
-            entity.Property(e => e.ItemNum).HasMaxLength(20);
+            entity.Property(e => e.ItemDesc).HasMaxLength(75);
+            entity.Property(e => e.ItemNum).HasMaxLength(50);
             entity.Property(e => e.QtyOpenToShip).HasDefaultValueSql("((0))");
             entity.Property(e => e.RowId)
                 .ValueGeneratedOnAdd()

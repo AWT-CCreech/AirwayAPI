@@ -7,6 +7,8 @@ public partial class TrkRwImItem
 {
     public string? ItemNum { get; set; }
 
+    public int? WarehouseId { get; set; }
+
     public string? ProductCode { get; set; }
 
     public string? ItemDesc { get; set; }
