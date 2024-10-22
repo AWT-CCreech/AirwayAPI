@@ -158,16 +158,22 @@ namespace AirwayAPI.Controllers.ReportControllers
                         join p in _context.TrkRwPoheaders on log.Ponum equals p.Ponum
                         join i in _context.TrkRwImItems on new { log.ItemNum, log.CompanyId } equals new { i.ItemNum, i.CompanyId }
                         join v in _context.TrkRwvendors on p.VendorNum equals v.VendorNum
+                        // Use a let clause to check for the existence of notes
+                        let hasNote = _context.TrkPonotes.Any(n => n.Ponum.ToString() == log.Ponum)
                         where log.Deleted == false &&
-                              log.IssueDate >= date1 && log.IssueDate <= date2 &&
-                              (CompanyID == "All" || log.CompanyId == CompanyID)
+                              log.IssueDate >= date1 && log.IssueDate <= date2
                         select new
                         {
                             log,
                             p,
                             i,
-                            v
+                            v,
+                            HasNote = hasNote
                         };
+
+            // Apply CompanyID filter conditionally
+            if (CompanyID != "All")
+                query = query.Where(l => l.log.CompanyId == CompanyID);
 
             // Apply additional filters
             if (!string.IsNullOrEmpty(PONum))
@@ -184,6 +190,19 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy != "All")
                 query = query.Where(l => l.log.IssuedBy == IssuedBy);
+
+            // Apply HasNotes filtering
+            if (!string.IsNullOrEmpty(HasNotes) && HasNotes != "All")
+            {
+                if (HasNotes.Equals("Yes", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(l => l.HasNote == true);
+                }
+                else if (HasNotes.Equals("No", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(l => l.HasNote == false);
+                }
+            }
 
             // PO Status Filtering
             if (POStatus == "Not Complete")
@@ -204,7 +223,8 @@ namespace AirwayAPI.Controllers.ReportControllers
             {
                 query = query.Where(l => l.log.QtyOrdered > l.log.QtyReceived && l.p.Postatus == 1 &&
                     ((l.log.ExpectedDelivery >= DateTime.Now && l.log.ExpectedDelivery <= DateTime.Now.AddDays(2)) ||
-                    (l.log.RequiredDate >= DateTime.Now && l.log.RequiredDate <= DateTime.Now.AddDays(2) && l.log.ExpectedDelivery == null)));
+                    (l.log.RequiredDate >= DateTime.Now && l.log.ExpectedDelivery == null &&
+                     l.log.RequiredDate >= DateTime.Now && l.log.RequiredDate <= DateTime.Now.AddDays(2))));
             }
 
             // EquipType Filtering
