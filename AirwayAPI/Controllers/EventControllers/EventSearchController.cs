@@ -29,6 +29,8 @@ namespace AirwayAPI.Controllers.EventControllers
         /// </summary>
         /// <param name="criteria">Contains search filters like dates, company, and rep ID.</param>
         /// <returns>A list of equipment requests that match the specified criteria, including sales rep username.</returns>
+        /// 
+
         [HttpGet("EquipmentRequestSearch")]
         public async Task<IActionResult> EquipmentRequestSearch([FromQuery] EquipmentRequestSearchCriteria criteria)
         {
