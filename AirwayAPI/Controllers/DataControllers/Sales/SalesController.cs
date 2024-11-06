@@ -26,10 +26,13 @@ namespace AirwayAPI.Controllers.DataControllers.Sales
         {
             var reps = await (from u in _context.Users
                               join d in _context.Departments on u.DeptId equals d.Id
-                              where d.Id == 2
-                                    && u.ActiveSales == 1
-                                    && u.Email != null && u.Email.Length > 1
-                                    && (u.Uname == "JHerbst" || u.Uname != null && !u.Uname.Contains("house"))
+                              where
+                                  (d.Id == 2
+                                   && u.ActiveSales == 1
+                                   && u.Email != null
+                                   && u.Email.Length > 1
+                                   && !u.Uname.Contains("house"))
+                                  || u.Uname == "JHerbst"
                               orderby u.Uname
                               select new
                               {
