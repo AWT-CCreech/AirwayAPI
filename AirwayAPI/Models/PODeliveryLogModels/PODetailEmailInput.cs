@@ -8,6 +8,7 @@
         public string Body { get; set; }
         public bool Urgent { get; set; }
         public string SoNum { get; set; }
+        public string SalesRep { get; set; }
         public string CompanyName { get; set; }
         public string SalesRequiredDate { get; set; }
         public string ExpectedDeliveryDate { get; set; }
