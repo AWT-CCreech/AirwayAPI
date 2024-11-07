@@ -1,5 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
+using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -183,7 +184,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
                 if (updateDto.UpdateAllDates)
                 {
-                    await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId!.Value);
+                    await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId!);
                 }
 
                 // Add new notes if present
@@ -254,7 +255,7 @@ namespace AirwayAPI.Controllers.ReportControllers
         private void UpdatePODetailFields(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
             poLogEntry.EditDate = DateTime.Now;
-            poLogEntry.EditedBy = updateDto.UserId!.Value;
+            poLogEntry.EditedBy = updateDto.UserId!;
             poLogEntry.ContactId = updateDto.ContactID;
             poLogEntry.ExpectedDelivery = updateDto.ExpectedDelivery;
 
