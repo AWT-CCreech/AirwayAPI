@@ -7,6 +7,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
+using System.Security.Claims;
 
 namespace AirwayAPI.Services
 {
@@ -14,11 +15,22 @@ namespace AirwayAPI.Services
     {
         private readonly eHelpDeskContext _context;
         private readonly ILogger<EmailService> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _environment;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public EmailService(eHelpDeskContext context, ILogger<EmailService> logger)
+        public EmailService(
+            eHelpDeskContext context,
+            ILogger<EmailService> logger,
+            IConfiguration configuration,
+            IWebHostEnvironment environment,
+            IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
+            _environment = environment;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // Centralized SendEmailAsync method
@@ -26,15 +38,31 @@ namespace AirwayAPI.Services
         {
             _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmail);
 
+            // Read SMTP configuration from appsettings
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            string smtpServer = emailSettings.GetValue<string>("SmtpServer");
+            int smtpPort = emailSettings.GetValue<int>("SmtpPort");
+            bool enableSsl = emailSettings.GetValue<bool>("EnableSsl");
+            bool overrideRecipient = emailSettings.GetValue<bool>("OverrideRecipient", false);
+
+            // Override recipient if setting is true
+            if (overrideRecipient)
+            {
+                string currentUserEmail = GetCurrentUserEmail();
+                emailInput.ToEmail = currentUserEmail;
+                emailInput.CCEmails = null; // Optional: Clear CC emails
+                _logger.LogInformation("Overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
+            }
+
             using var client = new SmtpClient();
 
-            // Remove or properly handle this in production environments
+            // Handle SSL certificate validation (adjust as necessary for production)
             client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
             try
             {
                 // Connect to the SMTP server
-                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
+                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
 
                 string userEmail = emailInput.FromEmail;
 
@@ -218,7 +246,7 @@ namespace AirwayAPI.Services
                                 Urgent = updateDto.UrgentEmail,
                                 Subject = updateDto.UrgentEmail
                                     ? $"*** PO#{updateDto.PONum} FOR {salesOrder.ShipToCompanyName} IS DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
-                                    : $"PO Delivery Date Exceeds the Sales Required Date for SO#{poLogEntry.SalesOrderNum}"
+                                    : $"PO Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}"
                             };
 
                             _logger.LogInformation("Sending delay notification email to {ToEmail}", salesRep.Email);
@@ -247,7 +275,6 @@ namespace AirwayAPI.Services
                 // Prepare the email body content
                 var emailBody = $@"
                     <h2>{emailInput.Subject}</h2>
-                    <p>Dear {emailInput.SalesRep},</p>
                     <p>The expected delivery date for the following sales order exceeds the required date:</p>
                     <table>
                         <tr><th>Sales Order Number</th><td>{emailInput.SoNum}</td></tr>
@@ -256,9 +283,7 @@ namespace AirwayAPI.Services
                         <tr><th>Expected Delivery Date</th><td>{emailInput.ExpectedDeliveryDate}</td></tr>
                         <tr><th>Part Number</th><td>{emailInput.PartNumber}</td></tr>
                         {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
-                    </table>
-                    <p>Please take the necessary actions.</p>
-                    <p>Best regards,<br/>{updateDto.UserName}</p>";
+                    </table>";
 
                 // Create an instance of EmailInput for the centralized method
                 var email = new EmailInput
@@ -292,5 +317,23 @@ namespace AirwayAPI.Services
             else
                 return $"{lowerUserName}@airway.com";
         }
+
+        private string GetCurrentUserEmail()
+        {
+            var usernameClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+            if (usernameClaim != null && !string.IsNullOrEmpty(usernameClaim.Value))
+            {
+                string username = usernameClaim.Value;
+                string emailAddress = $"{username}@airway.com";
+                _logger.LogInformation("Constructed email from username: {Email}", emailAddress);
+                return emailAddress;
+            }
+            else
+            {
+                _logger.LogError("Current user's username not found in claims.");
+                throw new InvalidOperationException("User's username claim is missing.");
+            }
+        }
+
     }
 }
