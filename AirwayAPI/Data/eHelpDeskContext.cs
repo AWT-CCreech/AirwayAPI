@@ -50,7 +50,11 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<QtQuote> QtQuotes { get; set; }
 
+    public virtual DbSet<QtQuoteDetail> QtQuoteDetails { get; set; }
+
     public virtual DbSet<QtSalesOrder> QtSalesOrders { get; set; }
+
+    public virtual DbSet<QtSalesOrderDetail> QtSalesOrderDetails { get; set; }
 
     public virtual DbSet<RequestEvent> RequestEvents { get; set; }
 
@@ -103,10 +107,6 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<UserPortalMenu> UserPortalMenus { get; set; }
 
     public virtual DbSet<UserPref> UserPrefs { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=AWTSQL19;Database=eHelpDesk;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1217,6 +1217,60 @@ public partial class eHelpDeskContext : DbContext
                 .HasComment("warranty in days");
         });
 
+        modelBuilder.Entity<QtQuoteDetail>(entity =>
+        {
+            entity.ToTable("qtQuoteDetail");
+
+            entity.HasIndex(e => new { e.QuoteId, e.RequestId }, "IX_QuoteDetail_QuoteID_ReqID").HasFillFactor(80);
+
+            entity.HasIndex(e => e.PartNum, "IX_qtQuoteDetail_PartNum").HasFillFactor(80);
+
+            entity.HasIndex(e => e.RequestId, "idx_qtQuoteDetail_RequestID");
+
+            entity.Property(e => e.Comments)
+                .HasDefaultValueSql("('')")
+                .HasColumnType("text");
+            entity.Property(e => e.Cost)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money");
+            entity.Property(e => e.CurCost)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money")
+                .HasColumnName("curCost");
+            entity.Property(e => e.CurExtPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money")
+                .HasColumnName("curExtPrice");
+            entity.Property(e => e.CurUnitPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money")
+                .HasColumnName("curUnitPrice");
+            entity.Property(e => e.ExtendedPrice).HasDefaultValueSql("((0))");
+            entity.Property(e => e.MfgPartNum)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.PartDesc)
+                .HasMaxLength(125)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.PartNum)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.QtyFound).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QtyRequested).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QuoteId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("QuoteID");
+            entity.Property(e => e.QuoteOrder).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QuoteQty).HasDefaultValueSql("((0))");
+            entity.Property(e => e.RequestId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("RequestID");
+            entity.Property(e => e.UnitMeasure)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("(N'Each')");
+            entity.Property(e => e.UnitPrice).HasDefaultValueSql("((0))");
+        });
+
         modelBuilder.Entity<QtSalesOrder>(entity =>
         {
             entity.HasKey(e => e.SaleId);
@@ -1338,6 +1392,55 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.Warranty)
                 .HasDefaultValueSql("((365))")
                 .HasComment("warranty in days");
+        });
+
+        modelBuilder.Entity<QtSalesOrderDetail>(entity =>
+        {
+            entity.ToTable("qtSalesOrderDetail");
+
+            entity.HasIndex(e => new { e.PartNum, e.UnitPrice }, "IX_qtSalesOrderDetail_3").HasFillFactor(80);
+
+            entity.HasIndex(e => e.SaleId, "IX_qtSalesOrderDetail_SaleID").HasFillFactor(80);
+
+            entity.HasIndex(e => new { e.SaleId, e.QtySold }, "IX_qtSalesOrderDetail_SalesID_QtySold").HasFillFactor(80);
+
+            entity.Property(e => e.AutoSoflag)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("AutoSOFlag");
+            entity.Property(e => e.CurExtPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money")
+                .HasColumnName("curExtPrice");
+            entity.Property(e => e.CurUnitPrice)
+                .HasDefaultValueSql("((0))")
+                .HasColumnType("money")
+                .HasColumnName("curUnitPrice");
+            entity.Property(e => e.ExtendedPrice).HasDefaultValueSql("((0))");
+            entity.Property(e => e.PartDesc)
+                .HasMaxLength(100)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.PartNum)
+                .HasMaxLength(50)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.QtySold).HasDefaultValueSql("((0))");
+            entity.Property(e => e.QuoteQty).HasDefaultValueSql("((0))");
+            entity.Property(e => e.RequestId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("RequestID");
+            entity.Property(e => e.SaleId)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("SaleID");
+            entity.Property(e => e.SaleOrder).HasDefaultValueSql("((0))");
+            entity.Property(e => e.Soflag)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("SOFlag");
+            entity.Property(e => e.UnitMeasure)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("('')");
+            entity.Property(e => e.UnitPrice).HasDefaultValueSql("((0))");
+            entity.Property(e => e.UpdatedByAutoSo)
+                .HasDefaultValueSql("((0))")
+                .HasColumnName("UpdatedByAutoSO");
         });
 
         modelBuilder.Entity<RequestEvent>(entity =>
