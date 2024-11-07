@@ -1,5 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models.SalesOrderWorkbenchModels;
+using AirwayAPI.Models.ServiceModels;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -98,13 +99,19 @@ namespace AirwayAPI.Controllers.ReportControllers
             // Send notification email
             if (!string.IsNullOrEmpty(salesOrder.BillToCompanyName) && salesOrder.BillToCompanyName.Contains("VERIZON"))
             {
-                await _emailService.SendEmailAsync(
-                    fromEmail: "it_department@airway.com",
-                    toEmail: "sbaker@airway.com",
-                    subject: request.Subject,
-                    htmlBody: request.HtmlBody,
-                    userName: request.Username,
-                    password: request.Password);
+                // Create an instance of EmailInput
+                var emailInput = new EmailInput
+                {
+                    FromEmail = "it_department@airway.com",
+                    ToEmail = "sbaker@airway.com",
+                    Subject = request.Subject,
+                    HtmlBody = request.HtmlBody,
+                    UserName = request.Username,
+                    Password = request.Password
+                };
+
+                // Call SendEmailAsync with the emailInput object
+                await _emailService.SendEmailAsync(emailInput);
             }
 
             return Ok();
