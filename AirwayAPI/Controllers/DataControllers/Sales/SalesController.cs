@@ -77,7 +77,7 @@ namespace AirwayAPI.Controllers.DataControllers.Sales
             var sortedAccounts = await _context.OpenSoreports
                                                 .Select(a => new { a.AccountNo })
                                                 .Distinct()
-                                                .OrderBy(a => a.AccountNo) // Sorting is done in the database
+                                                .OrderBy(a => a.AccountNo)
                                                 .ToListAsync();
 
             return Ok(sortedAccounts);
