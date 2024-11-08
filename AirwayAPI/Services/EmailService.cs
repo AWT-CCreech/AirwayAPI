@@ -1,11 +1,8 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Data;
-using AirwayAPI.Models;
-using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Models.ServiceModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using System.Security.Claims;
 
@@ -30,104 +27,32 @@ namespace AirwayAPI.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
-        // Centralized SendEmailAsync method
+        // Centralized method to send emails
         public async Task SendEmailAsync(EmailInput emailInput)
         {
             _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmail);
 
-            // Read SMTP configuration from appsettings
-            var emailSettings = _configuration.GetSection("EmailSettings");
-            string smtpServer = emailSettings.GetValue<string>("SmtpServer") ?? throw new InvalidOperationException("SMTP Server is not configured.");
-            int smtpPort = emailSettings.GetValue<int>("SmtpPort");
-            bool enableSsl = emailSettings.GetValue<bool>("EnableSsl");
-            bool overrideRecipient = emailSettings.GetValue<bool>("OverrideRecipient", false);
+            // Retrieve SMTP configuration
+            var (smtpServer, smtpPort, enableSsl) = GetSmtpConfiguration();
 
-            // Override recipient if setting is true
-            if (overrideRecipient)
-            {
-                string currentUserEmail = GetCurrentUserEmail();
-                emailInput.ToEmail = currentUserEmail;
-                emailInput.CCEmails = new List<string>(); // Assign empty list instead of null
-                _logger.LogInformation("Overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
-            }
+            // Override recipient if in development mode
+            OverrideRecipientForDevelopment(emailInput);
+
+            // Use the provided fromEmail or default to the current user's email
+            emailInput.FromEmail ??= GetCurrentUserEmail();
 
             using var client = new SmtpClient();
-
-            // Handle SSL certificate validation (adjust as necessary for production)
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            ConfigureSmtpClient(client, enableSsl);
 
             try
             {
-                // Connect to the SMTP server
-                SecureSocketOptions socketOptions = enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
-                await client.ConnectAsync(smtpServer, smtpPort, socketOptions);
-
-                string userEmail = emailInput.FromEmail;
-
-                // Authenticate with the SMTP server
-                _logger.LogInformation("Authenticating as {UserEmail}", userEmail);
-                string decryptedPassword = LoginUtils.DecryptPassword(emailInput.Password);
-                await client.AuthenticateAsync(userEmail, decryptedPassword);
-
-                // Create the email message
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress("Airway", userEmail));
-                message.To.Add(MailboxAddress.Parse(emailInput.ToEmail));
-
-                // Add CC recipients if any
-                if (emailInput.CCEmails != null && emailInput.CCEmails.Count != 0)
-                {
-                    foreach (var ccEmail in emailInput.CCEmails)
-                    {
-                        if (!string.IsNullOrWhiteSpace(ccEmail))
-                        {
-                            message.Cc.Add(MailboxAddress.Parse(ccEmail));
-                        }
-                    }
-                }
-
-                message.Subject = emailInput.Subject;
-
-                // Build the email body with modern styling
-                var bodyBuilder = new BodyBuilder
-                {
-                    HtmlBody = ApplyEmailStyling(emailInput.HtmlBody)
-                };
-
-                // Add attachments if any
-                if (emailInput.Attachments != null && emailInput.Attachments.Count != 0)
-                {
-                    foreach (var attachmentPath in emailInput.Attachments)
-                    {
-                        if (!string.IsNullOrWhiteSpace(attachmentPath))
-                        {
-                            bodyBuilder.Attachments.Add(attachmentPath);
-                        }
-                    }
-                }
-
-                message.Body = bodyBuilder.ToMessageBody();
+                await AuthenticateSmtpClient(client, emailInput.Password);
+                var message = CreateEmailMessage(emailInput);
 
                 // Send the email
                 _logger.LogInformation("Sending email to {ToEmail}", emailInput.ToEmail);
                 await client.SendAsync(message);
-
                 _logger.LogInformation("Email sent successfully.");
-            }
-            catch (AuthenticationException authEx)
-            {
-                _logger.LogError(authEx, "SMTP Authentication failed for {UserEmail}", emailInput.FromEmail);
-                throw new InvalidOperationException($"SMTP Authentication failed: {authEx.Message}", authEx);
-            }
-            catch (SmtpCommandException smtpEx)
-            {
-                _logger.LogError(smtpEx, "SMTP command error while sending email");
-                throw new InvalidOperationException($"SMTP command error: {smtpEx.Message}", smtpEx);
-            }
-            catch (SmtpProtocolException smtpProtocolEx)
-            {
-                _logger.LogError(smtpProtocolEx, "SMTP protocol error while sending email");
-                throw new InvalidOperationException($"SMTP protocol error: {smtpProtocolEx.Message}", smtpProtocolEx);
             }
             catch (Exception ex)
             {
@@ -136,23 +61,112 @@ namespace AirwayAPI.Services
             }
             finally
             {
-                // Disconnect from the SMTP server
-                if (client.IsConnected)
-                {
-                    await client.DisconnectAsync(true);
-                    _logger.LogInformation("SMTP connection closed.");
-                }
+                await DisconnectSmtpClient(client);
             }
         }
 
-        // Helper method to apply modern email styling
+        // Retrieves SMTP server configuration from appsettings
+        private (string smtpServer, int smtpPort, bool enableSsl) GetSmtpConfiguration()
+        {
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            string smtpServer = emailSettings.GetValue<string>("SmtpServer") ?? throw new InvalidOperationException("SMTP Server is not configured.");
+            int smtpPort = emailSettings.GetValue<int>("SmtpPort");
+            bool enableSsl = emailSettings.GetValue<bool>("EnableSsl");
+
+            return (smtpServer, smtpPort, enableSsl);
+        }
+
+        // Override email recipient for development purposes
+        private void OverrideRecipientForDevelopment(EmailInput emailInput)
+        {
+            if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
+            {
+                string currentUserEmail = GetCurrentUserEmail();
+                emailInput.ToEmail = currentUserEmail;
+                emailInput.CCEmails = new List<string>();
+                _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
+            }
+        }
+
+        // Configures the SMTP client
+        private void ConfigureSmtpClient(SmtpClient client, bool enableSsl)
+        {
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true; // Handle SSL certificate validation
+        }
+
+        // Authenticates the SMTP client
+        private async Task AuthenticateSmtpClient(SmtpClient client, string password)
+        {
+            string currentUserEmail = GetCurrentUserEmail();
+            string decryptedPassword = LoginUtils.DecryptPassword(password);
+            _logger.LogInformation("Authenticating as {UserEmail}", currentUserEmail);
+            await client.ConnectAsync(GetSmtpConfiguration().smtpServer, GetSmtpConfiguration().smtpPort, GetSmtpConfiguration().enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
+            await client.AuthenticateAsync(currentUserEmail, decryptedPassword);
+        }
+
+        // Creates the email message
+        private MimeMessage CreateEmailMessage(EmailInput emailInput)
+        {
+            var message = new MimeMessage
+            {
+                From = { new MailboxAddress("Airway", emailInput.FromEmail) },
+                To = { MailboxAddress.Parse(emailInput.ToEmail) },
+                Subject = emailInput.Subject
+            };
+
+            // Add CC recipients
+            if (emailInput.CCEmails != null)
+            {
+                foreach (var ccEmail in emailInput.CCEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
+                {
+                    message.Cc.Add(MailboxAddress.Parse(ccEmail));
+                }
+            }
+
+            // Set email priority if marked as urgent
+            if (emailInput.Urgent)
+            {
+                message.Headers.Add("X-Priority", "1"); // Highest priority
+                message.Headers.Add("X-MSMail-Priority", "High");
+                message.Headers.Add("Importance", "High");
+            }
+
+            // Build the email body with styling
+            var bodyBuilder = new BodyBuilder
+            {
+                HtmlBody = ApplyEmailStyling(emailInput.HtmlBody)
+            };
+
+            // Add attachments if any
+            if (emailInput.Attachments != null)
+            {
+                foreach (var attachmentPath in emailInput.Attachments.Where(path => !string.IsNullOrWhiteSpace(path)))
+                {
+                    bodyBuilder.Attachments.Add(attachmentPath);
+                }
+            }
+
+            message.Body = bodyBuilder.ToMessageBody();
+            return message;
+        }
+
+        // Disconnects the SMTP client
+        private async Task DisconnectSmtpClient(SmtpClient client)
+        {
+            if (client.IsConnected)
+            {
+                await client.DisconnectAsync(true);
+                _logger.LogInformation("SMTP connection closed.");
+            }
+        }
+
+        // Applies modern styling to the email body
         private static string ApplyEmailStyling(string bodyContent)
         {
-            var styledBody = $@"
+            return $@"
                 <html>
                 <head>
                     <style>
-                        /* Your CSS styles */
                         .card {{
                             max-width: 600px;
                             margin: auto;
@@ -205,124 +219,9 @@ namespace AirwayAPI.Services
                     </div>
                 </body>
                 </html>";
-            return styledBody;
         }
 
-        // Method to check conditions and send delivery date email
-        public async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
-        {
-            _logger.LogInformation("Checking delivery date email conditions for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-
-            try
-            {
-                var salesOrder = await _context.QtSalesOrders
-                    .FirstOrDefaultAsync(s => s.RwsalesOrderNum == poLogEntry.SalesOrderNum);
-
-                if (salesOrder == null)
-                {
-                    _logger.LogWarning("Sales Order not found for SO#{Sonum}", poLogEntry.SalesOrderNum);
-                    return;
-                }
-
-                DateTime? saleReqDate = salesOrder.RequiredDate;
-                if (updateDto.ExpectedDelivery.HasValue && saleReqDate.HasValue &&
-                    updateDto.ExpectedDelivery.Value > saleReqDate.Value)
-                {
-                    if (poLogEntry.DeliveryDateEmail != true)
-                    {
-                        poLogEntry.DeliveryDateEmail = true;
-                        _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-
-                        var salesRep = await _context.Users
-                            .FirstOrDefaultAsync(u => u.Id == salesOrder.AccountMgr);
-
-                        if (salesRep != null && !string.IsNullOrEmpty(salesRep.Email))
-                        {
-                            var emailInput = new PODetailEmailInput
-                            {
-                                ToEmail = salesRep.Email,
-                                SoNum = poLogEntry.SalesOrderNum ?? "Unknown SO",
-                                SalesRep = salesRep.Uname ?? "Sales Representative",
-                                CompanyName = salesOrder.ShipToCompanyName ?? "Unknown Company",
-                                SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
-                                ExpectedDeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
-                                PartNumber = poLogEntry.ItemNum ?? "Unknown Part",
-                                Notes = updateDto.NewNote ?? "",
-                                Urgent = updateDto.UrgentEmail,
-                                Subject = updateDto.UrgentEmail
-                                    ? $"*** PO#{updateDto.PONum} FOR {salesOrder.ShipToCompanyName} IS DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
-                                    : $"PO Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}"
-                            };
-
-                            _logger.LogInformation("Sending delay notification email to {ToEmail}", salesRep.Email);
-                            await PODetailUpdateSendEmail(emailInput, updateDto);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Sales representative email not found for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-                throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
-            }
-        }
-
-        private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
-        {
-            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmail);
-
-            try
-            {
-                // Prepare the email body content
-                var emailBody = $@"
-                    <h2>{emailInput.Subject}</h2>
-                    <p>The expected delivery date for the following sales order exceeds the required date:</p>
-                    <table>
-                        <tr><th>Sales Order Number</th><td>{emailInput.SoNum}</td></tr>
-                        <tr><th>Company Name</th><td>{emailInput.CompanyName}</td></tr>
-                        <tr><th>Sales Required Date</th><td>{emailInput.SalesRequiredDate}</td></tr>
-                        <tr><th>Expected Delivery Date</th><td>{emailInput.ExpectedDeliveryDate}</td></tr>
-                        <tr><th>Part Number</th><td>{emailInput.PartNumber}</td></tr>
-                        {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
-                    </table>";
-
-                // Create an instance of EmailInput for the centralized method
-                var email = new EmailInput
-                {
-                    FromEmail = GetSenderEmail(updateDto.UserName),
-                    ToEmail = emailInput.ToEmail,
-                    Subject = emailInput.Subject,
-                    HtmlBody = emailBody,
-                    UserName = updateDto.UserName,
-                    Password = updateDto.Password,
-                    CCEmails = new List<string>(), // Assign empty list instead of null
-                    Attachments = new List<string>() // Assign empty list instead of null
-                };
-
-                // Use the centralized SendEmailAsync method
-                await SendEmailAsync(email);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while sending email.");
-                throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
-            }
-        }
-
-        // Helper method to get sender email address
-        private static string GetSenderEmail(string userName)
-        {
-            string lowerUserName = userName.Trim().ToLower();
-            if (lowerUserName == "lvonderporten")
-                return "lvonder@airway.com";
-            else
-                return $"{lowerUserName}@airway.com";
-        }
-
+        // Gets the current user's email from claims
         private string GetCurrentUserEmail()
         {
             var usernameClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
@@ -339,6 +238,5 @@ namespace AirwayAPI.Services
                 throw new InvalidOperationException("User's username claim is missing.");
             }
         }
-
     }
 }
