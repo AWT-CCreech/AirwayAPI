@@ -119,11 +119,11 @@ namespace AirwayAPI.Controllers.ReportControllers
             // Updated HasNotes filtering logic
             if (!string.IsNullOrEmpty(HasNotes))
             {
-                if (HasNotes.ToLower() == "yes")
+                if (HasNotes.Equals("yes", StringComparison.CurrentCultureIgnoreCase))
                 {
                     query = query.Where(l => l.NotesExist == true); // Check for existence of notes
                 }
-                else if (HasNotes.ToLower() == "no")
+                else if (HasNotes.Equals("no", StringComparison.CurrentCultureIgnoreCase))
                 {
                     query = query.Where(l => l.NotesExist == false); // Check for absence of notes
                 }

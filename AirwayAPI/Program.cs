@@ -62,25 +62,43 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
 
-        // Add event handler for token validation failures
+        // Configure JwtBearer events
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
             {
-                context.Response.StatusCode = 401;
-                context.Response.ContentType = "application/json";
-                var result = JsonSerializer.Serialize(new { message = "Authentication failed." });
-                context.Response.WriteAsync(result);
+                // Log the authentication failure
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError(context.Exception, "Authentication failed.");
+
+                // Do not modify the response here to prevent response already started issues
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                // Override the default challenge response
+                context.HandleResponse();
+
+                // Check if the response has already started
+                if (!context.Response.HasStarted)
+                {
+                    context.Response.StatusCode = 401;
+                    context.Response.ContentType = "application/json";
+
+                    var result = JsonSerializer.Serialize(new { message = "Authentication failed." });
+                    return context.Response.WriteAsync(result);
+                }
+
+                // If the response has already started, do not attempt to modify it
                 return Task.CompletedTask;
             },
             OnTokenValidated = context =>
             {
-                // Optional: Log successful validation or perform additional checks
+                // Optional: Additional token validation or logging
                 return Task.CompletedTask;
             }
         };
     });
-
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -126,6 +144,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Uncomment the following line if you want to enforce HTTPS
 // app.UseHttpsRedirection();
 
 // Serve static files from wwwroot

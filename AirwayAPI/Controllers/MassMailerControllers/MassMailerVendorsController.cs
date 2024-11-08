@@ -30,7 +30,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 .Where(vendor => vendor.Email != null && EF.Functions.Like(vendor.Email, "%@%") && vendor.ActiveStatus == 1);
 
             // Apply filtering for Mfgs
-            if (mfg.Trim().ToLower() != "all")
+            if (!mfg.Trim().Equals("all", StringComparison.CurrentCultureIgnoreCase))
             {
                 var mfgLower = mfg.Trim().ToLower();
                 query = query.Where(vendor => vendor.Mfgs != null && EF.Functions.Like(vendor.Mfgs.ToLower(), $"%{mfgLower}%"));
