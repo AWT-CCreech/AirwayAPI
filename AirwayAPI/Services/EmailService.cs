@@ -16,20 +16,17 @@ namespace AirwayAPI.Services
         private readonly eHelpDeskContext _context;
         private readonly ILogger<EmailService> _logger;
         private readonly IConfiguration _configuration;
-        private readonly IWebHostEnvironment _environment;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public EmailService(
             eHelpDeskContext context,
             ILogger<EmailService> logger,
             IConfiguration configuration,
-            IWebHostEnvironment environment,
             IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _logger = logger;
             _configuration = configuration;
-            _environment = environment;
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -40,7 +37,7 @@ namespace AirwayAPI.Services
 
             // Read SMTP configuration from appsettings
             var emailSettings = _configuration.GetSection("EmailSettings");
-            string smtpServer = emailSettings.GetValue<string>("SmtpServer");
+            string smtpServer = emailSettings.GetValue<string>("SmtpServer") ?? throw new InvalidOperationException("SMTP Server is not configured.");
             int smtpPort = emailSettings.GetValue<int>("SmtpPort");
             bool enableSsl = emailSettings.GetValue<bool>("EnableSsl");
             bool overrideRecipient = emailSettings.GetValue<bool>("OverrideRecipient", false);
@@ -50,7 +47,7 @@ namespace AirwayAPI.Services
             {
                 string currentUserEmail = GetCurrentUserEmail();
                 emailInput.ToEmail = currentUserEmail;
-                emailInput.CCEmails = null; // Optional: Clear CC emails
+                emailInput.CCEmails = new List<string>(); // Assign empty list instead of null
                 _logger.LogInformation("Overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
             }
 
@@ -62,13 +59,15 @@ namespace AirwayAPI.Services
             try
             {
                 // Connect to the SMTP server
-                await client.ConnectAsync(smtpServer, smtpPort, SecureSocketOptions.StartTls);
+                SecureSocketOptions socketOptions = enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
+                await client.ConnectAsync(smtpServer, smtpPort, socketOptions);
 
                 string userEmail = emailInput.FromEmail;
 
                 // Authenticate with the SMTP server
                 _logger.LogInformation("Authenticating as {UserEmail}", userEmail);
-                await client.AuthenticateAsync(userEmail, LoginUtils.decryptPassword(emailInput.Password));
+                string decryptedPassword = LoginUtils.DecryptPassword(emailInput.Password);
+                await client.AuthenticateAsync(userEmail, decryptedPassword);
 
                 // Create the email message
                 var message = new MimeMessage();
@@ -76,11 +75,14 @@ namespace AirwayAPI.Services
                 message.To.Add(MailboxAddress.Parse(emailInput.ToEmail));
 
                 // Add CC recipients if any
-                if (emailInput.CCEmails != null)
+                if (emailInput.CCEmails != null && emailInput.CCEmails.Count != 0)
                 {
                     foreach (var ccEmail in emailInput.CCEmails)
                     {
-                        message.Cc.Add(MailboxAddress.Parse(ccEmail));
+                        if (!string.IsNullOrWhiteSpace(ccEmail))
+                        {
+                            message.Cc.Add(MailboxAddress.Parse(ccEmail));
+                        }
                     }
                 }
 
@@ -93,11 +95,14 @@ namespace AirwayAPI.Services
                 };
 
                 // Add attachments if any
-                if (emailInput.Attachments != null)
+                if (emailInput.Attachments != null && emailInput.Attachments.Count != 0)
                 {
                     foreach (var attachmentPath in emailInput.Attachments)
                     {
-                        bodyBuilder.Attachments.Add(attachmentPath);
+                        if (!string.IsNullOrWhiteSpace(attachmentPath))
+                        {
+                            bodyBuilder.Attachments.Add(attachmentPath);
+                        }
                     }
                 }
 
@@ -141,7 +146,7 @@ namespace AirwayAPI.Services
         }
 
         // Helper method to apply modern email styling
-        private string ApplyEmailStyling(string bodyContent)
+        private static string ApplyEmailStyling(string bodyContent)
         {
             var styledBody = $@"
                 <html>
@@ -294,8 +299,8 @@ namespace AirwayAPI.Services
                     HtmlBody = emailBody,
                     UserName = updateDto.UserName,
                     Password = updateDto.Password,
-                    CCEmails = null, // Add CC emails if needed
-                    Attachments = null // Add attachments if needed
+                    CCEmails = new List<string>(), // Assign empty list instead of null
+                    Attachments = new List<string>() // Assign empty list instead of null
                 };
 
                 // Use the centralized SendEmailAsync method
@@ -309,7 +314,7 @@ namespace AirwayAPI.Services
         }
 
         // Helper method to get sender email address
-        private string GetSenderEmail(string userName)
+        private static string GetSenderEmail(string userName)
         {
             string lowerUserName = userName.Trim().ToLower();
             if (lowerUserName == "lvonderporten")

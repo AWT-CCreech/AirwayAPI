@@ -37,26 +37,26 @@ namespace AirwayAPI.Controllers.DropShipControllers
                 using (var client = new SmtpClient())
                 {
                     await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                    if (input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                     {
-                        await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.decryptPassword(input.Password));
+                        await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.DecryptPassword(input.Password));
                     }
                     else
                     {
-                        await client.AuthenticateAsync(input.SenderUserName.Trim().ToLower() + "@airway.com", LoginUtils.decryptPassword(input.Password));
+                        await client.AuthenticateAsync(input.SenderUserName.Trim().ToLower() + "@airway.com", LoginUtils.DecryptPassword(input.Password));
                     }
 
                     User? senderInfo;
-                    if (input.SenderUserName.Trim().ToLower() == "lvonder")
+                    if (input.SenderUserName.Trim().Equals("lvonder", StringComparison.CurrentCultureIgnoreCase))
                     {
                         senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
+                            .Where(user => user.Uname != null && user.Uname.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                             .FirstOrDefaultAsync();
                     }
                     else
                     {
                         senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.SenderUserName.Trim().ToLower())
+                            .Where(user => user.Uname != null && user.Uname.Trim().Equals(input.SenderUserName.Trim(), StringComparison.CurrentCultureIgnoreCase))
                             .FirstOrDefaultAsync();
                     }
 
@@ -66,7 +66,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     }
 
                     string senderFullname = senderInfo.Fname + " " + senderInfo.Lname;
-                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                    if (input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                     {
                         senderFullname = "Linda Von der Porten";
                     }
@@ -74,15 +74,15 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     var message = new MimeMessage();
 
                     // Sender profile
-                    message.From.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                    message.From.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase) ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
 
                     // Check if running on localhost:5001
-                    bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost" && HttpContext.Request.Host.Port == 5001;
+                    bool isLocalhost = HttpContext.Request.Host.Host.Equals("localhost", StringComparison.CurrentCultureIgnoreCase) && HttpContext.Request.Host.Port == 5001;
 
                     if (isLocalhost)
                     {
                         // Only send to current user
-                        message.To.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                        message.To.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase) ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
                     }
                     else
                     {

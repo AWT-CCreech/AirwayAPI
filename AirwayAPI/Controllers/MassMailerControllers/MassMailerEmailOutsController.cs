@@ -45,20 +45,20 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 string senderUserName = input.SenderUserName.Trim().ToLower();
                 string email = senderUserName == "lvonderporten" ? "lvonder@airway.com" : senderUserName + "@airway.com";
 
-                await client.AuthenticateAsync(email, LoginUtils.decryptPassword(input.Password));
+                await client.AuthenticateAsync(email, LoginUtils.DecryptPassword(input.Password));
 
                 User? senderInfo;
-                if (input.SenderUserName.Trim().ToLower() == "lvonder")
+                if (input.SenderUserName.Trim().Equals("lvonder", StringComparison.CurrentCultureIgnoreCase))
                 {
                     senderInfo = await _context.Users
-                        .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
+                        .Where(user => user.Uname != null && user.Uname.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                         .FirstOrDefaultAsync();
                 }
                 else
                 {
                     var normalizedSenderUserName = input.SenderUserName?.Trim().ToLower();
                     senderInfo = await _context.Users
-                        .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == normalizedSenderUserName)
+                        .Where(user => user.Uname != null && user.Uname.Trim().Equals(normalizedSenderUserName, StringComparison.CurrentCultureIgnoreCase))
                         .FirstOrDefaultAsync();
                 }
 
@@ -69,7 +69,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                 string senderFullname = (senderInfo.Fname ?? string.Empty) + " " + (senderInfo.Lname ?? string.Empty);
 
-                if (!string.IsNullOrEmpty(input.SenderUserName) && input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                if (!string.IsNullOrEmpty(input.SenderUserName) && input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                 {
                     senderFullname = "Linda Von der Porten";
                 }
@@ -78,7 +78,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                 if (!string.IsNullOrEmpty(input.SenderUserName))
                 {
-                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                    if (input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
                     {
                         message.From.Add(new MailboxAddress(senderFullname, "lvonder@airway.com"));
                     }
@@ -191,7 +191,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                                            join e in _context.RequestEvents on r.EventId equals e.EventId
                                            join cc in _context.CamContacts on e.ContactId equals cc.Id
                                            where r.RequestId == item.Id
-                                           && c.Company != null && c.Company.Trim().ToLower() == input.RecipientCompanies[i].Trim().ToLower()
+                                           && c.Company != null && c.Company.Trim().Equals(input.RecipientCompanies[i].Trim(), StringComparison.CurrentCultureIgnoreCase)
                                            select c.Id).ToListAsync();
 
                         if (check.Count == 0)
@@ -265,7 +265,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                         string lastName = temp.Length >= 2 ? temp[^1] : string.Empty;
 
                         // Check if running on localhost
-                        bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost";
+                        bool isLocalhost = HttpContext.Request.Host.Host.Equals("localhost", StringComparison.CurrentCultureIgnoreCase);
 
                         if (isLocalhost)
                         {
@@ -295,7 +295,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                     else
                     {
                         var errorMessage = new MimeMessage();
-                        var senderEmail = input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com";
+                        var senderEmail = input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase) ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com";
                         errorMessage.From.Add(new MailboxAddress(senderFullname, senderEmail));
                         errorMessage.To.Add(new MailboxAddress(senderFullname, senderEmail));
 
