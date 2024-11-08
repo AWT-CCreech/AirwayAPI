@@ -1,6 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.PODeliveryLogModels;
+using AirwayAPI.Models.ServiceModels;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,8 +18,7 @@ namespace AirwayAPI.Controllers.ReportControllers
         private readonly EmailService _emailService;
         private readonly ILogger<PODetailController> _logger;
 
-        public PODetailController(
-            eHelpDeskContext context, EmailService emailService, ILogger<PODetailController> logger)
+        public PODetailController(eHelpDeskContext context, EmailService emailService, ILogger<PODetailController> logger)
         {
             _context = context;
             _emailService = emailService;
@@ -29,7 +29,6 @@ namespace AirwayAPI.Controllers.ReportControllers
         [HttpGet("id/{id}")]
         public async Task<IActionResult> GetPODetailByID(int id)
         {
-            // Fetch the PO log entry with associated notes based on the provided ID
             var poLogEntry = await _context.TrkPologs
                 .Where(p => p.Id == id)
                 .Select(p => new
@@ -46,10 +45,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                     p.IssuedBy,
                     p.DateDelivered,
                     p.EditDate,
-                    EditedBy = _context.Users
-                        .Where(u => u.Id == p.EditedBy)
-                        .Select(u => u.Uname)
-                        .FirstOrDefault(),
+                    EditedBy = _context.Users.Where(u => u.Id == p.EditedBy).Select(u => u.Uname).FirstOrDefault(),
                     p.ExpDelEditDate,
                     Notes = _context.TrkPonotes
                         .Where(n => n.Ponum.ToString() == p.Ponum)
@@ -59,8 +55,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                             n.Notes,
                             n.EntryDate,
                             n.EnteredBy
-                        })
-                        .ToList(),
+                        }).ToList(),
                     Contact = _context.CamContacts
                         .Where(c => c.Id == p.ContactId)
                         .Select(c => new
@@ -68,15 +63,10 @@ namespace AirwayAPI.Controllers.ReportControllers
                             c.Contact,
                             c.Company,
                             Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
-                        })
-                        .FirstOrDefault()
-                })
-                .FirstOrDefaultAsync();
+                        }).FirstOrDefault()
+                }).FirstOrDefaultAsync();
 
-            if (poLogEntry == null)
-            {
-                return NotFound("PO log entry not found.");
-            }
+            if (poLogEntry == null) return NotFound("PO log entry not found.");
 
             // If ContactId is missing, attempt to retrieve it from RequestPos
             int? contactId = poLogEntry.ContactId;
@@ -89,12 +79,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             var contactDetails = contactId.HasValue
                 ? await _context.CamContacts
                     .Where(c => c.Id == contactId)
-                    .Select(c => new
-                    {
-                        c.Contact,
-                        c.Company,
-                        Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
-                    })
+                    .Select(c => new { c.Contact, c.Company, Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain })
                     .FirstOrDefaultAsync()
                 : null;
 
@@ -115,9 +100,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 EditDate = poLogEntry.EditDate,
                 EditedBy = poLogEntry.EditedBy,
                 ExpDelEditDate = poLogEntry.ExpDelEditDate ?? "",
-                NotesList = poLogEntry.Notes
-                    .Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}")
-                    .ToList(),
+                NotesList = poLogEntry.Notes.Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}").ToList(),
                 ContactName = contactDetails?.Contact ?? "PLEASE UPDATE",
                 Company = contactDetails?.Company ?? "",
                 Phone = contactDetails?.Phone ?? ""
@@ -130,16 +113,10 @@ namespace AirwayAPI.Controllers.ReportControllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePODetail(int id, [FromBody] PODetailUpdateDto updateDto)
         {
-            if (id != updateDto.Id)
-            {
-                return BadRequest("ID mismatch.");
-            }
+            if (id != updateDto.Id) return BadRequest("ID mismatch.");
 
             var poLogEntry = await _context.TrkPologs.FindAsync(id);
-            if (poLogEntry == null)
-            {
-                return NotFound("PO log entry not found.");
-            }
+            if (poLogEntry == null) return NotFound("PO log entry not found.");
 
             // Retrieve SONum if not provided
             if (string.IsNullOrEmpty(updateDto.SONum))
@@ -164,7 +141,6 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
 
             using var transaction = await _context.Database.BeginTransactionAsync();
-
             try
             {
                 bool expectedDeliveryChanged = poLogEntry.ExpectedDelivery != updateDto.ExpectedDelivery;
@@ -196,7 +172,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 // Send Email if conditions are met
                 if (expectedDeliveryChanged)
                 {
-                    await _emailService.CheckAndSendDeliveryDateEmail(poLogEntry, updateDto);
+                    await CheckAndSendDeliveryDateEmail(poLogEntry, updateDto);
                 }
 
                 await _context.SaveChangesAsync();
@@ -209,6 +185,103 @@ namespace AirwayAPI.Controllers.ReportControllers
                 _logger.LogError(ex, "Error updating PO detail for ID {Id}", id);
                 await transaction.RollbackAsync();
                 return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        private async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
+        {
+            _logger.LogInformation("Checking delivery date email conditions for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+            try
+            {
+                var salesOrder = await _context.QtSalesOrders.FirstOrDefaultAsync(s => s.RwsalesOrderNum == poLogEntry.SalesOrderNum);
+                if (salesOrder == null)
+                {
+                    _logger.LogWarning("Sales Order not found for SO#{Sonum}", poLogEntry.SalesOrderNum);
+                    return;
+                }
+
+                DateTime? saleReqDate = salesOrder.RequiredDate;
+                if (updateDto.ExpectedDelivery.HasValue && saleReqDate.HasValue &&
+                    updateDto.ExpectedDelivery.Value > saleReqDate.Value)
+                {
+                    if (poLogEntry.DeliveryDateEmail != true)
+                    {
+                        poLogEntry.DeliveryDateEmail = true;
+                        _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+
+                        var salesRep = await _context.Users.FirstOrDefaultAsync(u => u.Id == salesOrder.AccountMgr);
+                        if (salesRep != null && !string.IsNullOrEmpty(salesRep.Email))
+                        {
+                            var emailInput = new PODetailEmailInput
+                            {
+                                ToEmail = salesRep.Email,
+                                SoNum = poLogEntry.SalesOrderNum ?? "Unknown SO",
+                                SalesRep = salesRep.Uname ?? "Sales Representative",
+                                CompanyName = salesOrder.ShipToCompanyName ?? "Unknown Company",
+                                SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
+                                ExpectedDeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
+                                PartNumber = poLogEntry.ItemNum ?? "Unknown Part",
+                                Notes = updateDto.NewNote ?? "",
+                                Urgent = updateDto.UrgentEmail,
+                                Subject = updateDto.UrgentEmail
+                                    ? $"*** PO#{updateDto.PONum} DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
+                                    : $"PO#{updateDto.PONum} Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}"
+                            };
+
+                            _logger.LogInformation("Sending delay notification email to {ToEmail}", salesRep.Email);
+                            await PODetailUpdateSendEmail(emailInput, updateDto);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Sales representative email not found for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+                throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
+            }
+        }
+
+        private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
+        {
+            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmail);
+            try
+            {
+                // Prepare the email body content
+                var emailBody = $@"
+                    <h2>{emailInput.Subject}</h2>
+                    <p>The expected delivery date for the following sales order exceeds the required date:</p>
+                    <table>
+                        <tr><th>Sales Order Number</th><td>{emailInput.SoNum}</td></tr>
+                        <tr><th>Company Name</th><td>{emailInput.CompanyName}</td></tr>
+                        <tr><th>Sales Required Date</th><td>{emailInput.SalesRequiredDate}</td></tr>
+                        <tr><th>Expected Delivery Date</th><td>{emailInput.ExpectedDeliveryDate}</td></tr>
+                        <tr><th>Part Number</th><td>{emailInput.PartNumber}</td></tr>
+                        {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
+                    </table>";
+
+                var email = new EmailInput
+                {
+                    FromEmail = null, // Update sendAs permissions if needed
+                    ToEmail = emailInput.ToEmail,
+                    Subject = emailInput.Subject,
+                    HtmlBody = emailBody,
+                    UserName = updateDto.UserName,
+                    Password = updateDto.Password,
+                    CCEmails = new List<string>(),
+                    Attachments = new List<string>(),
+                    Urgent = emailInput.Urgent
+                };
+
+                await _emailService.SendEmailAsync(email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while sending email.");
+                throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
             }
         }
 
@@ -233,14 +306,9 @@ namespace AirwayAPI.Controllers.ReportControllers
                 Notes = note
             };
 
-
-            // Add the note to the database
             await _context.TrkSonotes.AddAsync(newSoNote);
-
             await _context.TrkPonotes.AddAsync(newPoNote);
-
-            // Insert CAM Activity related to the note
-            await InsertCAMActivity(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, note, enteredBy);
+            await InsertCAMActivityAsync(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, note, enteredBy);
         }
 
         private async Task<int?> GetContactIdIfMissing(string poNum)
@@ -289,12 +357,9 @@ namespace AirwayAPI.Controllers.ReportControllers
                 };
 
                 _context.RequestPohistories.Add(history);
-
-                // Update the RequestPO record
                 requestPO.DeliveryDate = updateDto.ExpectedDelivery;
                 requestPO.EditedBy = updateDto.UserId;
                 requestPO.EditDate = DateTime.Now;
-
                 _context.RequestPos.Update(requestPO);
             }
 
@@ -303,10 +368,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
         private async Task UpdateAllPODeliveryDates(string poNum, DateTime? expectedDelivery, int userId)
         {
-            var poLogs = await _context.TrkPologs
-                .Where(p => p.Ponum == poNum)
-                .ToListAsync();
-
+            var poLogs = await _context.TrkPologs.Where(p => p.Ponum == poNum).ToListAsync();
             foreach (var poLog in poLogs)
             {
                 poLog.ExpectedDelivery = expectedDelivery;
@@ -318,7 +380,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             await _context.SaveChangesAsync();
         }
 
-        private async Task InsertCAMActivity(int contactId, string poNum, string note, string enteredBy)
+        private async Task InsertCAMActivityAsync(int contactId, string poNum, string note, string enteredBy)
         {
             string camNote = $"OPEN PO UPDATE FOR PO#{poNum}: {note}";
 
@@ -327,7 +389,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 ContactId = contactId,
                 ActivityOwner = enteredBy,
                 ActivityType = "CallOut",
-                DurationHours = 0, 
+                DurationHours = 0,
                 DurationMins = 0,
                 ProjectCode = "",
                 Notes = camNote,
