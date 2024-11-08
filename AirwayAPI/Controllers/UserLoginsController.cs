@@ -17,6 +17,7 @@ namespace AirwayAPI.Controllers
         private readonly eHelpDeskContext _context;
         private readonly ILogger<UserLoginsController> _logger;
         private readonly TokenService _tokenService; // Inject TokenService
+        private static readonly string[] predefinedUserArray = new[] { "mgibson", "lvonder", "kgildersleeve" };
 
         public UserLoginsController(
             eHelpDeskContext context,
@@ -37,10 +38,10 @@ namespace AirwayAPI.Controllers
                 return BadRequest(new { message = "Username or password cannot be empty." });
             }
 
-            var usernameTrimmedLower = login.username.Trim().ToLower();
+            var usernameTrimmedLower = login.username?.Trim().ToLower() ?? string.Empty;
             int userCount = await _context.Users
-                                          .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == usernameTrimmedLower)
-                                          .CountAsync();
+                            .Where(u => (u.Uname ?? "").Trim().ToLower() == usernameTrimmedLower)
+                            .CountAsync();
 
             if (userCount == 0 && !IsPredefinedUser(usernameTrimmedLower))
             {
@@ -55,7 +56,7 @@ namespace AirwayAPI.Controllers
                 {
                     if (IsBase64String(login.password))
                     {
-                        login.password = LoginUtils.decryptPassword(login.password);
+                        login.password = LoginUtils.DecryptPassword(login.password);
                     }
                     else
                     {
@@ -75,7 +76,7 @@ namespace AirwayAPI.Controllers
                 var token = _tokenService.GenerateJwtToken(login.username);
 
                 // Re-encrypt the password before sending it back to the client
-                login.password = LoginUtils.encryptPassword(login.password);
+                login.password = LoginUtils.EncryptPassword(login.password);
                 login.isPasswordEncrypted = true; // Indicate that the password is now encrypted
 
                 login.userid = userid.ToString();
@@ -123,8 +124,7 @@ namespace AirwayAPI.Controllers
             };
         }
 
-        private static bool IsPredefinedUser(string username) =>
-            new[] { "mgibson", "lvonder", "kgildersleeve" }.Contains(username);
+        private static bool IsPredefinedUser(string username) => predefinedUserArray.Contains(username);
 
         private static bool IsBase64String(string base64)
         {

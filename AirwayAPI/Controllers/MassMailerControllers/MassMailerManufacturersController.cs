@@ -22,8 +22,8 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         public async Task<ActionResult<IEnumerable<string>>> GetMfgList()
         {
             return await _context.CamFieldsLists
-                .Where(cfl => (cfl.ListName != null && cfl.ListName.Trim().ToLower() == "massmailer") &&
-                              (cfl.FieldName != null && cfl.FieldName.Trim().ToLower() == "mfg"))
+                .Where(cfl => (cfl.ListName != null && cfl.ListName.Trim().Equals("massmailer", StringComparison.CurrentCultureIgnoreCase)) &&
+                              (cfl.FieldName != null && cfl.FieldName.Trim().Equals("mfg", StringComparison.CurrentCultureIgnoreCase)))
                 .OrderBy(cfl => cfl.FieldValue)
                 .Select(cfl => cfl.FieldValue ?? string.Empty) // Replace null FieldValue with empty string
                 .ToListAsync();

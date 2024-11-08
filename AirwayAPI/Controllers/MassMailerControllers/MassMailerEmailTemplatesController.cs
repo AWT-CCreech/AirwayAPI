@@ -30,7 +30,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         public async Task<ActionResult<IEnumerable<CamCannedEmail>>> GetCamCannedEmails(string user)
         {
             var templatesForUser = await _context.CamCannedEmails
-                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == user.Trim().ToLower())
+                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().Equals(user.Trim(), StringComparison.CurrentCultureIgnoreCase))
                 .ToListAsync();
 
             if (templatesForUser == null)
@@ -44,7 +44,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         public ActionResult<CamCannedEmail> GetCamCannedEmails(string user, int id)
         {
             var templateForUserWithId = _context.CamCannedEmails
-                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == user.Trim().ToLower() && email.Id == id)
+                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().Equals(user.Trim(), StringComparison.CurrentCultureIgnoreCase) && email.Id == id)
                 .FirstOrDefault();
 
             if (templateForUserWithId == null)
