@@ -3,10 +3,10 @@
     public class EquipmentRequestUpdateDto
     {
         public int Id { get; set; }
-        public string RWSalesOrderNum { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-        public string Subject { get; set; }
-        public string HtmlBody { get; set; }
+        public string RWSalesOrderNum { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Subject { get; set; } = string.Empty;
+        public string HtmlBody { get; set; } = string.Empty;
     }
 }

@@ -8,14 +8,9 @@ namespace AirwayAPI.Controllers.DropShipControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class DropShipInfoController : ControllerBase
+    public class DropShipInfoController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public DropShipInfoController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         [HttpGet("{poNum}")]
         public async Task<ActionResult<object>> GetDropShipInfo(string poNum)

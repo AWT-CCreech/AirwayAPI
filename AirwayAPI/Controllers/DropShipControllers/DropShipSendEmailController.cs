@@ -14,14 +14,9 @@ namespace AirwayAPI.Controllers.DropShipControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class DropShipSendEmailController : ControllerBase
+    public class DropShipSendEmailController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public DropShipSendEmailController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         [HttpPost]
         public async Task<ActionResult> DropShipSendEmailAsync([FromBody] DropShipEmailInput input)
@@ -37,7 +32,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                 using (var client = new SmtpClient())
                 {
                     await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                    if (input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
+                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
                     {
                         await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.DecryptPassword(input.Password));
                     }
@@ -47,16 +42,16 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     }
 
                     User? senderInfo;
-                    if (input.SenderUserName.Trim().Equals("lvonder", StringComparison.CurrentCultureIgnoreCase))
+                    if (input.SenderUserName.Trim().ToLower() == "lvonder")
                     {
                         senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
+                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
                             .FirstOrDefaultAsync();
                     }
                     else
                     {
                         senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().Equals(input.SenderUserName.Trim(), StringComparison.CurrentCultureIgnoreCase))
+                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.SenderUserName.Trim().ToLower())
                             .FirstOrDefaultAsync();
                     }
 
@@ -66,7 +61,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     }
 
                     string senderFullname = senderInfo.Fname + " " + senderInfo.Lname;
-                    if (input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase))
+                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
                     {
                         senderFullname = "Linda Von der Porten";
                     }
@@ -74,15 +69,15 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     var message = new MimeMessage();
 
                     // Sender profile
-                    message.From.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase) ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                    message.From.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
 
                     // Check if running on localhost:5001
-                    bool isLocalhost = HttpContext.Request.Host.Host.Equals("localhost", StringComparison.CurrentCultureIgnoreCase) && HttpContext.Request.Host.Port == 5001;
+                    bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost" && HttpContext.Request.Host.Port == 5001;
 
                     if (isLocalhost)
                     {
                         // Only send to current user
-                        message.To.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().Equals("lvonderporten", StringComparison.CurrentCultureIgnoreCase) ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                        message.To.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
                     }
                     else
                     {
@@ -169,7 +164,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     };
                     message.Body = bodyBuilder.ToMessageBody();
 
-                    // Send email out
+                    // Send email
                     await client.SendAsync(message);
 
                     // Close connection after the email is sent
@@ -180,7 +175,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message + "    .........    " + ex.StackTrace);
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message + " ......... " + ex.StackTrace);
             }
         }
     }

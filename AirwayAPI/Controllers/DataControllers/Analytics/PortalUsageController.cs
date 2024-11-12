@@ -10,16 +10,10 @@ namespace AirwayAPI.Controllers.DataControllers.Analytics
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PortalUsageController : ControllerBase
+    public class PortalUsageController(eHelpDeskContext context, ILogger<PortalUsageController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<PortalUsageController> _logger;
-
-        public PortalUsageController(eHelpDeskContext context, ILogger<PortalUsageController> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<PortalUsageController> _logger = logger;
 
         [HttpPost("LogUsage")]
         public async Task<IActionResult> LogUsage([FromBody] LogPortalUsageRequest request)

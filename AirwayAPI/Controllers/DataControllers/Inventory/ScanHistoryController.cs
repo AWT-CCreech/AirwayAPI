@@ -8,16 +8,10 @@ namespace AirwayAPI.Controllers.DataControllers.Inventory
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class ScanHistoryController : ControllerBase
+    public class ScanHistoryController(eHelpDeskContext context, ILogger<ScanHistoryController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<ScanHistoryController> _logger;
-
-        public ScanHistoryController(eHelpDeskContext context, ILogger<ScanHistoryController> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<ScanHistoryController> _logger = logger;
 
         [HttpGet("GetDropShipParts")]
         public async Task<IActionResult> GetDropShipParts([FromQuery] string? poNo = null, [FromQuery] string? soNo = null)

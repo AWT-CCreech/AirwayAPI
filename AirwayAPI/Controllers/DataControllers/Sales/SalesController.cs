@@ -8,14 +8,9 @@ namespace AirwayAPI.Controllers.DataControllers.Sales
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesController : ControllerBase
+    public class SalesController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public SalesController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         /// <summary>
         /// Retrieves a list of active sales reps.

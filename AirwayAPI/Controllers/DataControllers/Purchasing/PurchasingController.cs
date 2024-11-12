@@ -8,14 +8,9 @@ namespace AirwayAPI.Controllers.DataControllers.Purchasing
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PurchasingController : ControllerBase
+    public class PurchasingController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public PurchasingController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         /// <summary>
         /// Retrieves a list of active purchasing reps.

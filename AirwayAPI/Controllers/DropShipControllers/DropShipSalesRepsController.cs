@@ -8,14 +8,9 @@ namespace AirwayAPI.Controllers.DropShipControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class DropShipSalesRepsController : ControllerBase
+    public class DropShipSalesRepsController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public DropShipSalesRepsController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         [HttpGet]
         public async Task<ActionResult<object>> GetAllSalesRep()

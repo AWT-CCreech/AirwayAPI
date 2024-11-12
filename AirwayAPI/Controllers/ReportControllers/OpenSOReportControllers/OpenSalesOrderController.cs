@@ -3,19 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.ReportControllers
+namespace AirwayAPI.Controllers.ReportControllers.OpenSOReportControllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class OpenSalesOrderController : ControllerBase
+    public class OpenSalesOrderController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public OpenSalesOrderController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         [HttpGet("GetOpenSalesOrders")]
         public async Task<IActionResult> GetOpenSalesOrders(

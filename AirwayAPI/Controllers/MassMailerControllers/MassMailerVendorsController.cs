@@ -3,23 +3,15 @@ using AirwayAPI.Models.MassMailerModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Controllers.MassMailerControllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class MassMailerVendorsController : ControllerBase
+    public class MassMailerVendorsController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public MassMailerVendorsController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         // GET: api/MassMailerVendors
         [HttpGet("{mfg}/{anc}/{fne}")]
@@ -30,13 +22,13 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 .Where(vendor => vendor.Email != null && EF.Functions.Like(vendor.Email, "%@%") && vendor.ActiveStatus == 1);
 
             // Apply filtering for Mfgs
-            if (!mfg.Trim().Equals("all", StringComparison.CurrentCultureIgnoreCase))
+            var mfgLower = mfg.Trim().ToLower();
+            if (mfgLower != "all")
             {
-                var mfgLower = mfg.Trim().ToLower();
                 query = query.Where(vendor => vendor.Mfgs != null && EF.Functions.Like(vendor.Mfgs.ToLower(), $"%{mfgLower}%"));
             }
 
-            // Apply filtering for ContactType
+            // Apply filtering for ContactType based on 'anc' and 'fne' flags
             if (!anc && !fne)
             {
                 query = query.Where(vendor =>
@@ -80,7 +72,5 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
             return Ok(result);
         }
-
-
     }
 }

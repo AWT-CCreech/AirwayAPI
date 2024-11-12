@@ -10,18 +10,11 @@ namespace AirwayAPI.Controllers.EventControllers
     //[Authorize] // Uncomment this once EventSearch page is live
     [ApiController]
     [Route("api/[controller]")]
-    public class EventSearchController : ControllerBase
+    public class EventSearchController(eHelpDeskContext context, ILogger<EventSearchController> logger) : ControllerBase
     {
         // Dependency Injection: `eHelpDeskContext` is injected here so we can query the database
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<EventSearchController> _logger; // Inject logger
-
-        // Constructor Injection: The DI system provides `eHelpDeskContext` and `ILogger` when this controller is created
-        public EventSearchController(eHelpDeskContext context, ILogger<EventSearchController> logger)
-        {
-            _context = context; // Assign context so it's available for all methods in this controller
-            _logger = logger; // Assign logger
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<EventSearchController> _logger = logger; // Inject logger
 
         /// <summary>
         /// Searches for equipment requests using a variety of criteria, including date range, status, 

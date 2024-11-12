@@ -7,23 +7,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.ReportControllers
+namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PODetailController : ControllerBase
+    public class PODetailController(eHelpDeskContext context, EmailService emailService, ILogger<PODetailController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly EmailService _emailService;
-        private readonly ILogger<PODetailController> _logger;
-
-        public PODetailController(eHelpDeskContext context, EmailService emailService, ILogger<PODetailController> logger)
-        {
-            _context = context;
-            _emailService = emailService;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly EmailService _emailService = emailService;
+        private readonly ILogger<PODetailController> _logger = logger;
 
         // GET: api/PODetail/id/{id}
         [HttpGet("id/{id}")]
@@ -271,8 +264,8 @@ namespace AirwayAPI.Controllers.ReportControllers
                     HtmlBody = emailBody,
                     UserName = updateDto.UserName,
                     Password = updateDto.Password,
-                    CCEmails = new List<string>(),
-                    Attachments = new List<string>(),
+                    CCEmails = [],
+                    Attachments = [],
                     Urgent = emailInput.Urgent
                 };
 
@@ -300,7 +293,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             var newPoNote = new TrkPonote
             {
-                Ponum = int.TryParse(poLogEntry.Ponum, out int parsedPonum) ? parsedPonum : (int?)null,
+                Ponum = int.TryParse(poLogEntry.Ponum, out int parsedPonum) ? parsedPonum : null,
                 EnteredBy = enteredBy,
                 EntryDate = DateTime.Now,
                 Notes = note

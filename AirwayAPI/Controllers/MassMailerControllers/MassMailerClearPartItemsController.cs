@@ -9,14 +9,9 @@ namespace AirwayAPI.Controllers.MassMailerControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class MassMailerClearPartItemsController : ControllerBase
+    public class MassMailerClearPartItemsController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public MassMailerClearPartItemsController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         // GET: api/MassMailerClearPartItems/5
         [HttpGet("{id}")]

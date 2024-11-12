@@ -9,14 +9,9 @@ namespace AirwayAPI.Controllers.MassMailerControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class MassMailerEmailTemplatesController : ControllerBase
+    public class MassMailerEmailTemplatesController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public MassMailerEmailTemplatesController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         // GET: api/MassMailerEmailTemplates
         [HttpGet]
@@ -29,41 +24,37 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         [HttpGet("{user}")]
         public async Task<ActionResult<IEnumerable<CamCannedEmail>>> GetCamCannedEmails(string user)
         {
+            var normalizedUser = user.Trim().ToLower();
             var templatesForUser = await _context.CamCannedEmails
-                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().Equals(user.Trim(), StringComparison.CurrentCultureIgnoreCase))
+                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == normalizedUser)
                 .ToListAsync();
 
-            if (templatesForUser == null)
+            if (!templatesForUser.Any())
                 return NotFound();
 
             return templatesForUser;
         }
-        
+
         // GET: api/MassMailerEmailTemplates/5
         [HttpGet("{user}/{id}")]
         public ActionResult<CamCannedEmail> GetCamCannedEmails(string user, int id)
         {
+            var normalizedUser = user.Trim().ToLower();
             var templateForUserWithId = _context.CamCannedEmails
-                .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().Equals(user.Trim(), StringComparison.CurrentCultureIgnoreCase) && email.Id == id)
-                .FirstOrDefault();
+                .FirstOrDefault(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == normalizedUser && email.Id == id);
 
             if (templateForUserWithId == null)
                 return NotFound();
 
             return templateForUserWithId;
         }
-        
 
         // PUT: api/MassMailerEmailTemplates/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCamCannedEmails(int id, CamCannedEmail camCannedEmails)
         {
             if (id != camCannedEmails.Id)
-            {
                 return BadRequest();
-            }
 
             _context.Entry(camCannedEmails).State = EntityState.Modified;
 
@@ -74,21 +65,15 @@ namespace AirwayAPI.Controllers.MassMailerControllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!CamCannedEmailsExists(id))
-                {
                     return NotFound();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return NoContent();
         }
 
         // POST: api/MassMailerEmailTemplates
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPost]
         public async Task<ActionResult<CamCannedEmail>> PostCamCannedEmails(CamCannedEmail camCannedEmails)
         {
@@ -100,13 +85,9 @@ namespace AirwayAPI.Controllers.MassMailerControllers
             catch (DbUpdateException)
             {
                 if (CamCannedEmailsExists(camCannedEmails.Id))
-                {
                     return Conflict();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return CreatedAtAction("GetCamCannedEmails", new { id = camCannedEmails.Id }, camCannedEmails);
@@ -118,9 +99,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         {
             var camCannedEmails = await _context.CamCannedEmails.FindAsync(id);
             if (camCannedEmails == null)
-            {
                 return NotFound();
-            }
 
             _context.CamCannedEmails.Remove(camCannedEmails);
             await _context.SaveChangesAsync();
