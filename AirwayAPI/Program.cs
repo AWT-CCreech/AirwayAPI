@@ -10,7 +10,11 @@ using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    // Alternatively, use null to keep PascalCase
+    // options.JsonSerializerOptions.PropertyNamingPolicy = null;
+);
 
 // Configure CORS to allow specific origins, methods, and headers
 builder.Services.AddCors(options =>
