@@ -35,13 +35,15 @@ namespace AirwayAPI.Controllers.MassMailerControllers
             return templatesForUser;
         }
 
-        // GET: api/MassMailerEmailTemplates/5
+        // GET: api/MassMailerEmailTemplates/ccreech/5
         [HttpGet("{user}/{id}")]
-        public ActionResult<CamCannedEmail> GetCamCannedEmails(string user, int id)
+        public async Task<ActionResult<CamCannedEmail>> GetCamCannedEmail(string user, int id)
         {
             var normalizedUser = user.Trim().ToLower();
-            var templateForUserWithId = _context.CamCannedEmails
-                .FirstOrDefault(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == normalizedUser && email.Id == id);
+            var templateForUserWithId = await _context.CamCannedEmails
+                .FirstOrDefaultAsync(email => email.EnteredBy != null &&
+                    email.EnteredBy.Trim().ToLower() == normalizedUser &&
+                    email.Id == id);
 
             if (templateForUserWithId == null)
                 return NotFound();
@@ -51,12 +53,12 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
         // PUT: api/MassMailerEmailTemplates/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCamCannedEmails(int id, CamCannedEmail camCannedEmails)
+        public async Task<IActionResult> PutCamCannedEmail(int id, CamCannedEmail camCannedEmail)
         {
-            if (id != camCannedEmails.Id)
+            if (id != camCannedEmail.Id)
                 return BadRequest();
 
-            _context.Entry(camCannedEmails).State = EntityState.Modified;
+            _context.Entry(camCannedEmail).State = EntityState.Modified;
 
             try
             {
@@ -64,7 +66,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CamCannedEmailsExists(id))
+                if (!CamCannedEmailExists(id))
                     return NotFound();
                 else
                     throw;
@@ -75,39 +77,39 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
         // POST: api/MassMailerEmailTemplates
         [HttpPost]
-        public async Task<ActionResult<CamCannedEmail>> PostCamCannedEmails(CamCannedEmail camCannedEmails)
+        public async Task<ActionResult<CamCannedEmail>> PostCamCannedEmail(CamCannedEmail camCannedEmail)
         {
-            _context.CamCannedEmails.Add(camCannedEmails);
+            _context.CamCannedEmails.Add(camCannedEmail);
             try
             {
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException)
             {
-                if (CamCannedEmailsExists(camCannedEmails.Id))
+                if (CamCannedEmailExists(camCannedEmail.Id))
                     return Conflict();
                 else
                     throw;
             }
 
-            return CreatedAtAction("GetCamCannedEmails", new { id = camCannedEmails.Id }, camCannedEmails);
+            return CreatedAtAction("GetCamCannedEmails", new { id = camCannedEmail.Id }, camCannedEmail);
         }
 
         // DELETE: api/MassMailerEmailTemplates/5
         [HttpDelete("{id}")]
-        public async Task<ActionResult<CamCannedEmail>> DeleteCamCannedEmails(int id)
+        public async Task<ActionResult<CamCannedEmail>> DeleteCamCannedEmail(int id)
         {
-            var camCannedEmails = await _context.CamCannedEmails.FindAsync(id);
-            if (camCannedEmails == null)
+            var camCannedEmail = await _context.CamCannedEmails.FindAsync(id);
+            if (camCannedEmail == null)
                 return NotFound();
 
-            _context.CamCannedEmails.Remove(camCannedEmails);
+            _context.CamCannedEmails.Remove(camCannedEmail);
             await _context.SaveChangesAsync();
 
-            return camCannedEmails;
+            return camCannedEmail;
         }
 
-        private bool CamCannedEmailsExists(int id)
+        private bool CamCannedEmailExists(int id)
         {
             return _context.CamCannedEmails.Any(e => e.Id == id);
         }
