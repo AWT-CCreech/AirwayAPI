@@ -2,6 +2,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
+using System.Linq;
+using System;
 
 namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
 {
@@ -13,7 +17,26 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
         private readonly eHelpDeskContext _context = context;
         private readonly ILogger<PODeliveryLogController> _logger = logger;
 
-        // GET: api/PODeliveryLog
+        /// <summary>
+        /// Retrieves a list of Purchase Order (PO) delivery logs based on various filter criteria.
+        /// This method provides detailed information about PO deliveries, including their status,
+        /// associated vendors, items, and related sales orders.
+        /// </summary>
+        /// <param name="PONum">Filters logs by Purchase Order number (optional).</param>
+        /// <param name="Vendor">Filters logs by vendor name (optional).</param>
+        /// <param name="PartNum">Filters logs by part number (optional).</param>
+        /// <param name="IssuedBy">Filters logs by the issuer's name (optional).</param>
+        /// <param name="SONum">Filters logs by Sales Order number (optional).</param>
+        /// <param name="xSalesRep">Filters logs by sales representative (optional).</param>
+        /// <param name="HasNotes">Filters logs based on the existence of notes ("yes", "no", or "all"). Default is "All".</param>
+        /// <param name="POStatus">Filters logs based on PO status ("Not Complete", "Complete", "Late", "Due w/n 2 days"). Default is "Not Complete".</param>
+        /// <param name="EquipType">Filters logs by equipment type ("anc", "fne", or "All"). Default is "All".</param>
+        /// <param name="CompanyID">Filters logs by company ID. Default is "AIR".</param>
+        /// <param name="YearRange">Filters logs within the specified year. Default is the current year.</param>
+        /// <returns>
+        /// An asynchronous action result containing a list of PO delivery logs that match the filter criteria.
+        /// Returns HTTP 200 OK with the results if successful.
+        /// </returns>
         [HttpGet]
         public async Task<IActionResult> GetPODeliveryLogs(
             [FromQuery] string? PONum,
@@ -31,15 +54,17 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
         {
             if (YearRange == 0) YearRange = DateTime.Now.Year;
 
-            var date1 = new DateTime(YearRange, 1, 1);
-            var date2 = new DateTime(YearRange, 12, 31);
+            var dateStart = new DateTime(YearRange, 1, 1);
+            var dateEnd = new DateTime(YearRange, 12, 31);
 
             _logger.LogInformation("Retrieving PODeliveryLogs for Year: {Year}, CompanyID: {CompanyID}", YearRange, CompanyID);
 
             var query = _context.TrkPologs
+                .AsNoTracking()
                 .Where(log => log.Deleted != true
-                    && log.IssueDate >= date1 && log.IssueDate <= date2
-                    && (CompanyID.ToLower() == "all" || log.CompanyId.ToLower() == CompanyID.ToLower()))
+                    && log.IssueDate >= dateStart
+                    && log.IssueDate <= dateEnd
+                    && (CompanyID.Equals("all", StringComparison.OrdinalIgnoreCase) || log.CompanyId.ToLower() == CompanyID.ToLower()))
                 .Select(log => new PODeliveryLogSearchResult
                 {
                     Id = log.Id,
@@ -120,7 +145,7 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                 _logger.LogInformation("Applying PartNum filter: {PartNum}", PartNum);
                 query = query.Where(l => l.ItemNum.Contains(PartNum));
             }
-            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep.ToLower() != "all")
+            if (!string.IsNullOrEmpty(xSalesRep) && !xSalesRep.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Applying SalesRep filter: {SalesRep}", xSalesRep);
                 query = query.Where(l => l.SalesRep.ToLower() == xSalesRep.ToLower());
@@ -141,18 +166,23 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                 case "late":
                     _logger.LogInformation("Applying POStatus filter: Late");
                     query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
-                        (((DateTime.Now > l.ExpectedDelivery) == true && (DateTime.Now > l.PORequiredDate) == true) ||
-                         ((DateTime.Now > l.PORequiredDate) == true && l.ExpectedDelivery == null)));
+                        (
+                            (l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
+                             l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value) ||
+                            (l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value && !l.ExpectedDelivery.HasValue)
+                        ));
                     break;
                 case "due w/n 2 days":
                     _logger.LogInformation("Applying POStatus filter: Due w/n 2 days");
                     query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
-                        (((l.ExpectedDelivery >= DateTime.Now) == true && (l.ExpectedDelivery <= DateTime.Now.AddDays(2)) == true) ||
-                         ((l.PORequiredDate >= DateTime.Now) == true && (l.PORequiredDate <= DateTime.Now.AddDays(2)) == true && l.ExpectedDelivery == null)));
+                        (
+                            (l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2)) ||
+                            (l.PORequiredDate.HasValue && l.PORequiredDate.Value >= DateTime.Now && l.PORequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue)
+                        ));
                     break;
             }
 
-            if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy.ToLower() != "all")
+            if (!string.IsNullOrEmpty(IssuedBy) && !IssuedBy.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Applying IssuedBy filter: {IssuedBy}", IssuedBy);
                 query = query.Where(l => l.IssuedBy.ToLower() == IssuedBy.ToLower());
@@ -173,12 +203,12 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                 }
             }
 
-            if (EquipType.ToLower() == "anc")
+            if (EquipType.Equals("anc", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Applying EquipType filter: Anc");
                 query = query.Where(l => l.ItemClassId == 23);
             }
-            else if (EquipType.ToLower() == "fne")
+            else if (EquipType.Equals("fne", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Applying EquipType filter: Fne");
                 query = query.Where(l => l.ItemClassId == 24);
@@ -189,6 +219,24 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
             return Ok(results);
         }
 
+        /// <summary>
+        /// Retrieves a distinct list of vendor names associated with Purchase Order (PO) delivery logs based on various filter criteria.
+        /// This method is useful for populating vendor selection lists or analyzing vendor-related data.
+        /// </summary>
+        /// <param name="PONum">Filters logs by Purchase Order number (optional).</param>
+        /// <param name="PartNum">Filters logs by part number (optional).</param>
+        /// <param name="IssuedBy">Filters logs by the issuer's name (optional).</param>
+        /// <param name="SONum">Filters logs by Sales Order number (optional).</param>
+        /// <param name="xSalesRep">Filters logs by sales representative (optional).</param>
+        /// <param name="HasNotes">Filters logs based on the existence of notes ("yes", "no", or "all"). Default is "All".</param>
+        /// <param name="POStatus">Filters logs based on PO status ("Not Complete", "Complete", "Late", "Due w/n 2 days"). Default is "Not Complete".</param>
+        /// <param name="EquipType">Filters logs by equipment type ("anc", "fne", or "All"). Default is "All".</param>
+        /// <param name="CompanyID">Filters logs by company ID. Default is "AIR".</param>
+        /// <param name="YearRange">Filters logs within the specified year. Default is the current year.</param>
+        /// <returns>
+        /// An asynchronous action result containing a distinct list of vendor names that match the filter criteria.
+        /// Returns HTTP 200 OK with the list of vendors if successful.
+        /// </returns>
         [HttpGet("vendors")]
         public async Task<IActionResult> GetVendors(
             [FromQuery] string? PONum,
@@ -204,75 +252,124 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
         )
         {
             if (YearRange == 0) YearRange = DateTime.Now.Year;
-            var date1 = new DateTime(YearRange, 1, 1);
-            var date2 = new DateTime(YearRange, 12, 31);
+            var dateStart = new DateTime(YearRange, 1, 1);
+            var dateEnd = new DateTime(YearRange, 12, 31);
 
-            var query = from log in _context.TrkPologs
-                        join p in _context.TrkRwPoheaders on log.Ponum equals p.Ponum
-                        join i in _context.TrkRwImItems on new { log.ItemNum, log.CompanyId } equals new { i.ItemNum, i.CompanyId }
-                        join v in _context.TrkRwvendors on p.VendorNum equals v.VendorNum
-                        let hasNote = _context.TrkPonotes.Any(n => n.Ponum.ToString() == log.Ponum)
-                        where log.Deleted == false &&
-                              log.IssueDate >= date1 && log.IssueDate <= date2
-                        select new { log, p, i, v, HasNote = hasNote };
+            _logger.LogInformation("Retrieving Vendors for Year: {Year}, CompanyID: {CompanyID}", YearRange, CompanyID);
 
-            // Apply CompanyID filter conditionally
-            if (CompanyID.ToLower() != "all")
-                query = query.Where(l => l.log.CompanyId.ToLower() == CompanyID.ToLower());
+            // Normalize CompanyID for case-insensitive comparison
+            bool filterCompany = !string.IsNullOrEmpty(CompanyID) && !CompanyID.Equals("all", StringComparison.OrdinalIgnoreCase);
+            string normalizedCompanyID = filterCompany ? CompanyID.ToLower() : string.Empty;
 
-            // Apply additional filters
-            if (!string.IsNullOrEmpty(PONum)) query = query.Where(l => l.log.Ponum.Contains(PONum));
-            if (!string.IsNullOrEmpty(SONum)) query = query.Where(l => l.log.SalesOrderNum.Contains(SONum));
-            if (!string.IsNullOrEmpty(PartNum)) query = query.Where(l => l.log.ItemNum.Contains(PartNum));
-            if (!string.IsNullOrEmpty(xSalesRep) && xSalesRep.ToLower() != "all") query = query.Where(l => l.log.SalesRep.ToLower() == xSalesRep.ToLower());
-            if (!string.IsNullOrEmpty(IssuedBy) && IssuedBy.ToLower() != "all") query = query.Where(l => l.log.IssuedBy.ToLower() == IssuedBy.ToLower());
+            // Start building the query
+            var query = _context.TrkPologs
+                .AsNoTracking()
+                .Where(log => log.Deleted != true
+                    && log.IssueDate >= dateStart
+                    && log.IssueDate <= dateEnd
+                    && (!filterCompany || log.CompanyId.ToLower() == normalizedCompanyID))
+                .Join(_context.TrkRwPoheaders,
+                      log => log.Ponum,
+                      p => p.Ponum,
+                      (log, p) => new { log, p })
+                .Join(_context.TrkRwvendors,
+                      combined => combined.p.VendorNum,
+                      v => v.VendorNum,
+                      (combined, v) => new { combined.log, combined.p, v })
+                .Where(l =>
+                    (string.IsNullOrEmpty(PONum) || l.log.Ponum.Contains(PONum)) &&
+                    (string.IsNullOrEmpty(SONum) || l.log.SalesOrderNum.Contains(SONum)) &&
+                    (string.IsNullOrEmpty(PartNum) || l.log.ItemNum.Contains(PartNum)) &&
+                    (string.IsNullOrEmpty(xSalesRep) || xSalesRep.Equals("all", StringComparison.OrdinalIgnoreCase) || l.log.SalesRep.ToLower() == xSalesRep.ToLower()) &&
+                    (string.IsNullOrEmpty(IssuedBy) || IssuedBy.Equals("all", StringComparison.OrdinalIgnoreCase) || l.log.IssuedBy.ToLower() == IssuedBy.ToLower())
+                )
+                .Select(l => new
+                {
+                    l.v.VendorName,
+                    l.log.ExpectedDelivery,
+                    l.p.RequiredDate, // Accessed from 'p'
+                    l.log.QtyOrdered,
+                    l.log.QtyReceived,
+                    l.p.Postatus, // Accessed from 'p'
+                    HasNote = _context.TrkPonotes.Any(n => n.Ponum.ToString() == l.log.Ponum)
+                });
 
-            // Apply HasNotes filtering
-            var normalizedHasNotes = HasNotes.ToLower();
-            if (normalizedHasNotes == "yes")
+            // Apply HasNotes filter
+            if (!string.IsNullOrEmpty(HasNotes))
             {
-                query = query.Where(l => l.HasNote == true);
+                var normalizedHasNotes = HasNotes.ToLower();
+                _logger.LogInformation("Applying HasNotes filter: {HasNotes}", HasNotes);
+                if (normalizedHasNotes == "yes")
+                {
+                    query = query.Where(l => l.HasNote);
+                }
+                else if (normalizedHasNotes == "no")
+                {
+                    query = query.Where(l => !l.HasNote);
+                }
             }
-            else if (normalizedHasNotes == "no")
+
+            // Apply POStatus filter
+            if (!string.IsNullOrEmpty(POStatus))
             {
-                query = query.Where(l => l.HasNote == false);
+                var normalizedPOStatus = POStatus.ToLower();
+                _logger.LogInformation("Applying POStatus filter: {POStatus}", POStatus);
+                switch (normalizedPOStatus)
+                {
+                    case "not complete":
+                        query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1);
+                        break;
+                    case "complete":
+                        query = query.Where(l => l.QtyOrdered <= l.QtyReceived);
+                        break;
+                    case "late":
+                        _logger.LogInformation("Applying POStatus filter: Late");
+                        query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
+                            (
+                                (l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
+                                 l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value) ||
+                                (l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value && !l.ExpectedDelivery.HasValue)
+                            ));
+                        break;
+                    case "due w/n 2 days":
+                        _logger.LogInformation("Applying POStatus filter: Due w/n 2 days");
+                        query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
+                            (
+                                (l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2)) ||
+                                (l.RequiredDate.HasValue && l.RequiredDate.Value >= DateTime.Now && l.RequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue)
+                            ));
+                        break;
+                    default:
+                        _logger.LogWarning("Unknown POStatus filter value: {POStatus}", POStatus);
+                        break;
+                }
             }
 
-            // PO Status Filtering
-            var normalizedPOStatus = POStatus.ToLower();
-            switch (normalizedPOStatus)
+            // Apply EquipType filter
+            if (!string.IsNullOrEmpty(EquipType))
             {
-                case "not complete":
-                    query = query.Where(l => l.log.QtyOrdered > l.log.QtyReceived && l.p.Postatus == 1);
-                    break;
-                case "complete":
-                    query = query.Where(l => l.log.QtyOrdered <= l.log.QtyReceived);
-                    break;
-                case "late":
-                    query = query.Where(l => l.log.QtyOrdered > l.log.QtyReceived && l.p.Postatus == 1 &&
-                        (DateTime.Now > l.log.ExpectedDelivery && DateTime.Now > l.log.RequiredDate ||
-                        DateTime.Now > l.log.RequiredDate && l.log.ExpectedDelivery == null));
-                    break;
-                case "due w/n 2 days":
-                    query = query.Where(l => l.log.QtyOrdered > l.log.QtyReceived && l.p.Postatus == 1 &&
-                        (l.log.ExpectedDelivery >= DateTime.Now && l.log.ExpectedDelivery <= DateTime.Now.AddDays(2) ||
-                        l.log.RequiredDate >= DateTime.Now && l.log.ExpectedDelivery == null &&
-                         l.log.RequiredDate >= DateTime.Now && l.log.RequiredDate <= DateTime.Now.AddDays(2)));
-                    break;
+                var normalizedEquipType = EquipType.ToLower();
+                _logger.LogInformation("Applying EquipType filter: {EquipType}", EquipType);
+                switch (normalizedEquipType)
+                {
+                    case "anc":
+                        query = query.Where(l => l.VendorName != null && l.VendorName.ToLower() == "anc");
+                        break;
+                    case "fne":
+                        query = query.Where(l => l.VendorName != null && l.VendorName.ToLower() == "fne");
+                        break;
+                        // Add other cases if necessary
+                }
             }
 
-            // EquipType Filtering
-            if (EquipType.ToLower() == "anc")
-                query = query.Where(l => l.i.ItemClassId == 23);
-            else if (EquipType.ToLower() == "fne")
-                query = query.Where(l => l.i.ItemClassId == 24);
-
+            // Select distinct VendorNames
             var vendors = await query
-                .Select(l => l.v.VendorName)
+                .Select(v => v.VendorName)
                 .Distinct()
                 .OrderBy(v => v)
                 .ToListAsync();
 
+            _logger.LogInformation("Retrieved {Count} Vendors after filtering", vendors.Count);
             return Ok(vendors);
         }
     }
