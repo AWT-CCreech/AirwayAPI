@@ -1,13 +1,15 @@
 ﻿using AirwayAPI.Data;
+using AirwayAPI.Models;
 using AirwayAPI.Models.SalesOrderWorkbenchModels;
 using AirwayAPI.Models.ServiceModels;
 using AirwayAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
 {
-    //[Authorize]
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class SalesOrderWorkbenchController : ControllerBase
@@ -54,6 +56,10 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                 if (eventId.HasValue)
                     query = query.Where(q => q.SalesOrder.EventId == eventId);
 
+                // Log the generated SQL query
+                var sqlQuery = query.ToQueryString();
+                _logger.LogInformation("Executing SQL Query: {SqlQuery}", sqlQuery);
+
                 var salesOrders = await query
                     .OrderBy(q => q.SalesOrder.EventId)
                     .ToListAsync();
@@ -80,7 +86,7 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                             join order in _context.QtSalesOrders on detail.SaleId equals order.SaleId
                             join mgr in _context.Users on order.AccountMgr equals mgr.Id into mgrJoin
                             from mgr in mgrJoin.DefaultIfEmpty()
-                            where detail.Soflag == true && order.Draft == false
+                            where detail.Soflag == true
                             select new
                             {
                                 SalesOrderDetail = detail,
@@ -96,6 +102,10 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
 
                 if (eventId.HasValue)
                     query = query.Where(q => q.SalesOrder.EventId == eventId);
+
+                // Log the generated SQL query
+                var sqlQuery = query.ToQueryString();
+                _logger.LogInformation("Executing SQL Query: {SqlQuery}", sqlQuery);
 
                 var details = await query
                     .OrderBy(q => q.SalesOrderDetail.RequestId)
@@ -117,10 +127,12 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var salesOrder = await _context.QtSalesOrders
                     .FirstOrDefaultAsync(so => so.SaleId == request.SaleId);
+
                 if (salesOrder == null)
                     return NotFound("Sales order not found.");
 
@@ -137,16 +149,84 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                     await _context.SaveChangesAsync();
                 }
 
-                // Send notification email
-                if (!string.IsNullOrEmpty(salesOrder.BillToCompanyName) && salesOrder.BillToCompanyName.Contains("VERIZON"))
+                // Fetch SalesOrderDetails with QtySold > 0
+                var salesOrderDetails = await _context.QtSalesOrderDetails
+                    .Where(d => d.SaleId == request.SaleId && d.QtySold > 0)
+                    .ToListAsync();
+
+                foreach (var detail in salesOrderDetails)
                 {
-                    await SendNotificationEmailAsync(request, "sbaker@airway.com");
+                    // Fetch the corresponding EquipmentRequest
+                    var equipmentRequest = await _context.EquipmentRequests
+                        .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId);
+
+                    if (equipmentRequest != null)
+                    {
+                        // Check if SalesOrderNum already contains the new sales order number
+                        bool existsInSalesOrderNum = equipmentRequest.SalesOrderNum?.Contains(request.RWSalesOrderNum) ?? false;
+
+                        if (!existsInSalesOrderNum)
+                        {
+                            // Update EquipmentRequest
+                            equipmentRequest.Status = "Sold";
+                            equipmentRequest.SalesOrderNum = string.IsNullOrEmpty(equipmentRequest.SalesOrderNum)
+                                ? request.RWSalesOrderNum
+                                : $"{equipmentRequest.SalesOrderNum}, {request.RWSalesOrderNum}";
+
+                            equipmentRequest.SalePrice = detail.UnitPrice;
+                            equipmentRequest.MarkedSoldDate = DateTime.Now;
+                            equipmentRequest.QtySold += detail.QtySold ?? 0;
+                            equipmentRequest.DropShipment = request.DropShipment;
+
+                            await _context.SaveChangesAsync();
+
+                            // Perform PWBQtyRules logic
+                            bool shouldMarkAsBought = await ShouldMarkAsBoughtAsync(equipmentRequest, detail.QtySold ?? 0);
+
+                            if (shouldMarkAsBought)
+                            {
+                                equipmentRequest.Bought = true;
+                                await _context.SaveChangesAsync();
+
+                                // Record the history of the item being marked bought
+                                var soldItemHistory = new TrkSoldItemHistory
+                                {
+                                    RequestId = equipmentRequest.RequestId,
+                                    Username = request.Username,
+                                    PageName = "UpdateSalesOrder"
+                                };
+                                _context.TrkSoldItemHistories.Add(soldItemHistory);
+                                await _context.SaveChangesAsync();
+                            }
+                            else
+                            {
+                                equipmentRequest.Bought = false;
+                                await _context.SaveChangesAsync();
+                            }
+                        }
+                    }
                 }
 
+                // Update EquipmentRequests where QtySold = 0 and EventID matches, set Status = 'Lost'
+                var equipmentRequestsToUpdate = await _context.EquipmentRequests
+                    .Where(er => er.QtySold == 0 && er.EventId == request.EventId)
+                    .ToListAsync();
+
+                foreach (var er in equipmentRequestsToUpdate)
+                {
+                    er.Status = "Lost";
+                }
+                await _context.SaveChangesAsync();
+
+                // Send notification emails
+                await HandleNotificationEmailsAsync(request, salesOrder);
+
+                await transaction.CommitAsync();
                 return Ok("Sales order updated successfully.");
             }
             catch (Exception ex)
             {
+                await transaction.RollbackAsync();
                 _logger.LogError($"Error updating SalesOrder: {ex.Message}", ex);
                 return StatusCode(500, "An error occurred while updating the sales order.");
             }
@@ -159,6 +239,7 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var salesOrderDetail = await _context.QtSalesOrderDetails
@@ -166,37 +247,224 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                 if (salesOrderDetail == null)
                     return NotFound("Sales order detail not found.");
 
-                var requestItem = await _context.EquipmentRequests
+                var equipmentRequest = await _context.EquipmentRequests
                     .FirstOrDefaultAsync(r => r.RequestId == salesOrderDetail.RequestId);
-                if (requestItem == null)
+                if (equipmentRequest == null)
                     return NotFound("Equipment request item not found.");
 
-                requestItem.Status = "Sold";
-                requestItem.SalesOrderNum = request.RWSalesOrderNum;
-                requestItem.SalePrice = salesOrderDetail.UnitPrice;
-                requestItem.MarkedSoldDate = DateTime.Now;
-                requestItem.QtySold += salesOrderDetail.QtySold;
+                // Update EquipmentRequest
+                equipmentRequest.Status = "Sold";
+                equipmentRequest.SalesOrderNum = string.IsNullOrEmpty(equipmentRequest.SalesOrderNum)
+                    ? request.RWSalesOrderNum
+                    : $"{equipmentRequest.SalesOrderNum}, {request.RWSalesOrderNum}";
+                equipmentRequest.SalePrice = salesOrderDetail.UnitPrice;
+                equipmentRequest.MarkedSoldDate = DateTime.Now;
+                equipmentRequest.QtySold += salesOrderDetail.QtySold ?? 0;
+                equipmentRequest.DropShipment = request.DropShipment;
+
+                // Reset SOFlag
+                salesOrderDetail.Soflag = false;
 
                 await _context.SaveChangesAsync();
 
+                // Perform PWBQtyRules logic
+                bool shouldMarkAsBought = await ShouldMarkAsBoughtAsync(equipmentRequest, salesOrderDetail.QtySold ?? 0);
+
+                if (shouldMarkAsBought)
+                {
+                    equipmentRequest.Bought = true;
+                    await _context.SaveChangesAsync();
+
+                    // Record the history of the item being marked bought
+                    var soldItemHistory = new TrkSoldItemHistory
+                    {
+                        RequestId = equipmentRequest.RequestId,
+                        Username = request.Username,
+                        PageName = "UpdateEquipmentRequest"
+                    };
+                    _context.TrkSoldItemHistories.Add(soldItemHistory);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    equipmentRequest.Bought = false;
+                    await _context.SaveChangesAsync();
+                }
+
+                await transaction.CommitAsync();
                 return Ok("Equipment request updated successfully.");
             }
             catch (Exception ex)
             {
+                await transaction.RollbackAsync();
                 _logger.LogError($"Error updating EquipmentRequest: {ex.Message}", ex);
                 return StatusCode(500, "An error occurred while updating the equipment request.");
             }
         }
 
-        // Helper method to send notification email
-        private async Task SendNotificationEmailAsync(SalesOrderUpdateDto request, string toEmail)
+        // Helper method to determine if the EquipmentRequest should be marked as Bought
+        private async Task<bool> ShouldMarkAsBoughtAsync(EquipmentRequest equipmentRequest, int qtySold)
+        {
+            // Implement the logic from PWBQtyRules.asp here
+            // Initialize variables
+            int QtyOnHand = 0;
+            int QtyInPick = 0;
+            int Adjustments = 0;
+            int QtyFound = 0;
+            int NeedToBuy = 0;
+            int QtyBought = 0;
+            int QtySoldToday = 0;
+            int QtyAvailToSell = 0;
+
+            string partNum = equipmentRequest.PartNum;
+            string altPartNum = equipmentRequest.AltPartNum;
+            int requestId = equipmentRequest.RequestId;
+            DateTime quoteDeadline = equipmentRequest.QuoteDeadLine ?? DateTime.Today.AddDays(30);
+            int quoteValidFor = Math.Max(0, (quoteDeadline - DateTime.Today).Days);
+
+            // Get QtyOnHand, QtyInPick
+            var inventoryItem = await (from r in _context.TrkRwImItems
+                                       join i in _context.TrkInventories on r.ItemNum equals i.ItemNum into ii
+                                       from i in ii.DefaultIfEmpty()
+                                       where i.ItemNum2 == partNum || i.ItemNum == partNum
+                                       select new
+                                       {
+                                           QtyOnHand = r.QtyOnHand ?? 0,
+                                           QtyInPick = r.QtyInPick ?? 0
+                                       }).FirstOrDefaultAsync();
+
+            if (inventoryItem != null)
+            {
+                QtyOnHand = inventoryItem.QtyOnHand;
+                QtyInPick = inventoryItem.QtyInPick;
+            }
+
+            // Get Adjustments
+            Adjustments = await (from a in _context.TrkAdjustments
+                                 join i in _context.TrkInventories on a.ItemNum equals i.ItemNum
+                                 where (i.ItemNum2 == partNum || i.ItemNum == partNum) && a.EntryDate == DateTime.Today
+                                 select a.QtyAdjustment).SumAsync() ?? 0;
+
+            // Get QtyBought
+            QtyBought = await _context.RequestPos
+                .Where(rp => rp.RequestId == requestId)
+                .Select(rp => rp.QtyBought)
+                .SumAsync() ?? 0;
+
+            // Get QtyFound
+            QtyFound = ((int)(await _context.CompetitorCalls
+                .Where(cc => (cc.PartNum == partNum || cc.MfgPartNum == altPartNum)
+                    && cc.HowMany > 0
+                    && cc.ModifiedDate >= DateTime.Now.AddDays(-quoteValidFor)
+                    && cc.QtyNotAvailable == false)
+                .Select(cc => cc.HowMany)
+                .SumAsync() ?? 0));
+
+            // Get QtySoldToday
+            QtySoldToday = await _context.EquipmentRequests
+                .Where(er => (er.PartNum == partNum || er.AltPartNum == altPartNum)
+                    && er.Status == "Sold"
+                    && er.MarkedSoldDate.HasValue
+                    && er.MarkedSoldDate.Value.Date == DateTime.Today
+                    && er.RequestId != requestId)
+                .Select(er => er.QtySold)
+                .SumAsync() ?? 0;
+
+            // Calculate QtyAvailToSell
+            QtyAvailToSell = QtyOnHand + Adjustments - QtyInPick - QtySoldToday;
+
+            // Calculate NeedToBuy
+            NeedToBuy = qtySold - QtyAvailToSell - QtyBought;
+
+            // Determine if item should be marked as Bought
+            return NeedToBuy <= 0;
+        }
+
+        // Helper method to handle notification emails
+        private async Task HandleNotificationEmailsAsync(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
+        {
+            // Check if BillToCompanyName contains 'VERIZON' and send email
+            if (!string.IsNullOrEmpty(salesOrder.BillToCompanyName) && salesOrder.BillToCompanyName.Contains("VERIZON", StringComparison.OrdinalIgnoreCase))
+            {
+                await SendNotificationEmailAsync(request, "sbaker@airway.com", $"A Verizon SO has been assigned to Event ID {request.EventId}");
+            }
+            else
+            {
+                // Additional conditions
+                var salesOrderInfo = await (from s in _context.QtSalesOrders
+                                            join e in _context.EquipmentRequests on s.EventId equals e.EventId into ee
+                                            from e in ee.DefaultIfEmpty()
+                                            join r in _context.RequestEvents on e.EventId equals r.EventId into rr
+                                            from r in rr.DefaultIfEmpty()
+                                            join p in _context.RequestPos on e.RequestId equals p.RequestId into pp
+                                            from p in pp.DefaultIfEmpty()
+                                            join u in _context.Users on p.PurchasedBy equals u.Id into uu
+                                            from u in uu.DefaultIfEmpty()
+                                            join u2 in _context.Users on r.EventOwner equals u2.Id into uu2
+                                            from u2 in uu2.DefaultIfEmpty()
+                                            where !s.BillToCompanyName.StartsWith("VERIZON", StringComparison.OrdinalIgnoreCase) && s.SaleId == request.SaleId
+                                            select new
+                                            {
+                                                s.BillToCompanyName,
+                                                s.Terms,
+                                                SalesRep = u2 != null ? u2.Uname : "",
+                                                PONum = p != null ? p.Ponum : "",
+                                                PORep = u != null ? u.Uname : ""
+                                            }).FirstOrDefaultAsync();
+
+                if (salesOrderInfo != null)
+                {
+                    // Check SO_Email_Notifications
+                    bool sendEmailToSbaker = await _context.SoEmailNotifications
+                        .AnyAsync(son => son.BillToCompanyName == salesOrderInfo.BillToCompanyName);
+
+                    if (sendEmailToSbaker)
+                    {
+                        await SendNotificationEmailAsync(request, "sbaker@airway.com", $"A {salesOrderInfo.BillToCompanyName} SO has been assigned to Event ID {request.EventId}");
+                    }
+
+                    // Check for prepayment alert
+                    if (salesOrderInfo.Terms == "0" && request.DropShipment && salesOrderInfo.PONum != "1234")
+                    {
+                        var dsSalesRepEmail = $"{salesOrderInfo.SalesRep}@airway.com";
+                        var dsPurchEmail = !string.IsNullOrEmpty(salesOrderInfo.PONum)
+                            ? $"{salesOrderInfo.PORep}@airway.com"
+                            : "Purch_Dept@airway.com";
+
+                        var recipients = new[] { dsSalesRepEmail, dsPurchEmail, "Acct_dept@airway.com" };
+
+                        var emailInput = new EmailInput
+                        {
+                            FromEmail = "it_department@airway.com",
+                            ToEmail = string.Join(",", recipients),
+                            Subject = $"PREPAYMENT ALERT FOR SO {request.RWSalesOrderNum}",
+                            HtmlBody = $@"
+                                <html><body>
+                                    <table>
+                                        <tr><td>SO Number: {request.RWSalesOrderNum} has been flagged as a drop shipment. This is a reminder to collect the prepayment before the item(s) ship.</td></tr>
+                                        <tr><td>Sales Rep: {salesOrderInfo.SalesRep}</td></tr>
+                                        {(string.IsNullOrEmpty(salesOrderInfo.PONum) ? "" : $"<tr><td>PO Number: {salesOrderInfo.PONum}</td></tr><tr><td>Purch Rep: {salesOrderInfo.PORep}</td></tr>")}
+                                    </table>
+                                </body></html>",
+                            UserName = request.Username,
+                            Password = request.Password,
+                        };
+
+                        await _emailService.SendEmailAsync(emailInput);
+                    }
+                }
+            }
+        }
+
+        // Updated SendNotificationEmailAsync to accept a custom subject
+        private async Task SendNotificationEmailAsync(SalesOrderUpdateDto request, string toEmail, string subject)
         {
             var emailInput = new EmailInput
             {
                 FromEmail = "it_department@airway.com",
                 ToEmail = toEmail,
-                Subject = request.Subject,
-                HtmlBody = request.HtmlBody,
+                Subject = subject,
+                HtmlBody = $"SO Number(s): {request.RWSalesOrderNum}",
                 UserName = request.Username,
                 Password = request.Password,
             };
