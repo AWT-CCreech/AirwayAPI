@@ -50,7 +50,7 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                                 so.BillToCompanyName,
                                 so.SaleTotal,
                                 so.SaleDate,
-                                SalesRepLastName = mgr.Lname
+                                SalesRep = mgr.Uname
                             };
 
                 if (eventId.HasValue && eventId.Value != 0)
@@ -106,7 +106,7 @@ namespace AirwayAPI.Controllers.ReportControllers.SalesOrderWorkbenchControllers
                                 detail.PartDesc,
                                 detail.UnitPrice,
                                 detail.ExtendedPrice,
-                                SalesRepLastName = mgr.Lname,
+                                SalesRep = mgr.Uname,
                                 order.RwsalesOrderNum,
                                 order.EventId,
                                 order.AccountMgr,
