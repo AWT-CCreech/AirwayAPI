@@ -34,6 +34,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<Department> Departments { get; set; }
 
+    public virtual DbSet<EmailLog> EmailLogs { get; set; }
+
     public virtual DbSet<EquipmentRequest> EquipmentRequests { get; set; }
 
     public virtual DbSet<EquipmentSnapshot> EquipmentSnapshots { get; set; }
@@ -709,6 +711,19 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.MgrId).HasColumnName("MgrID");
             entity.Property(e => e.OpHours).HasMaxLength(20);
             entity.Property(e => e.Phone).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<EmailLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__EmailLog__3214EC0706FE4246");
+
+            entity.Property(e => e.LoggedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LoggedBy).HasMaxLength(50);
+            entity.Property(e => e.OrderNumber).HasMaxLength(50);
+            entity.Property(e => e.OrderType).HasMaxLength(50);
+            entity.Property(e => e.SenderEmail).HasMaxLength(255);
         });
 
         modelBuilder.Entity<EquipmentRequest>(entity =>
