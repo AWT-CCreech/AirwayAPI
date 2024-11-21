@@ -1,7 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.PODeliveryLogModels;
-using AirwayAPI.Models.ServiceModels;
+using AirwayAPI.Models.DTOs;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -256,7 +256,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                         {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
                     </table>";
 
-                var email = new EmailInput
+                var email = new EmailInputDto
                 {
                     FromEmail = null, // Update sendAs permissions if needed
                     ToEmail = emailInput.ToEmail,
