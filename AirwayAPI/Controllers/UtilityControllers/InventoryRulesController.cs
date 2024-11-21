@@ -56,7 +56,7 @@ namespace AirwayAPI.Controllers.UtilityControllers
                                      {
                                          r.QtyOnHand,
                                          r.QtyCost,
-                                         TrkUnitCost = i.TrkUnitCost,
+                                         i.TrkUnitCost,
                                          r.QtyInPick
                                      }).FirstOrDefaultAsync();
 
