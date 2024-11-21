@@ -1,6 +1,4 @@
-﻿using AirwayAPI.Application;
-using AirwayAPI.Data;
-using AirwayAPI.Models.ServiceModels;
+﻿using AirwayAPI.Models.DTOs;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -8,27 +6,30 @@ using System.Security.Claims;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService(
-        ILogger<EmailService> logger,
-        IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor)
+    public class EmailService : IEmailService
     {
-        private readonly ILogger<EmailService> _logger = logger;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly ILogger<EmailService> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        // Centralized method to send emails
-        public async Task SendEmailAsync(EmailInput emailInput)
+        public EmailService(
+            ILogger<EmailService> logger,
+            IConfiguration configuration,
+            IHttpContextAccessor httpContextAccessor)
+        {
+            _logger = logger;
+            _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public async Task SendEmailAsync(EmailInputDto emailInput)
         {
             _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmail);
 
-            // Retrieve SMTP configuration
             var (smtpServer, smtpPort, enableSsl) = GetSmtpConfiguration();
 
-            // Override recipient if in development mode
             OverrideRecipientForDevelopment(emailInput);
 
-            // Use the provided fromEmail or default to the current user's email
             emailInput.FromEmail ??= GetCurrentUserEmail();
 
             using var client = new SmtpClient();
@@ -36,10 +37,9 @@ namespace AirwayAPI.Services
 
             try
             {
-                await AuthenticateSmtpClient(client, emailInput.Password);
+                await AuthenticateSmtpClient(client);
                 var message = CreateEmailMessage(emailInput);
 
-                // Send the email
                 _logger.LogInformation("Sending email to {ToEmail}", emailInput.ToEmail);
                 await client.SendAsync(message);
                 _logger.LogInformation("Email sent successfully.");
@@ -55,7 +55,6 @@ namespace AirwayAPI.Services
             }
         }
 
-        // Retrieves SMTP server configuration from appsettings
         private (string smtpServer, int smtpPort, bool enableSsl) GetSmtpConfiguration()
         {
             var emailSettings = _configuration.GetSection("EmailSettings");
@@ -66,36 +65,33 @@ namespace AirwayAPI.Services
             return (smtpServer, smtpPort, enableSsl);
         }
 
-        // Override email recipient for development purposes
-        private void OverrideRecipientForDevelopment(EmailInput emailInput)
+        private void OverrideRecipientForDevelopment(EmailInputDto emailInput)
         {
             if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
             {
                 string currentUserEmail = GetCurrentUserEmail();
                 emailInput.ToEmail = currentUserEmail;
-                emailInput.CCEmails = [];
+                emailInput.CCEmails = new List<string>();
                 _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
             }
         }
 
-        // Configures the SMTP client
         private static void ConfigureSmtpClient(SmtpClient client, bool enableSsl)
         {
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true; // Handle SSL certificate validation
+            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
         }
 
-        // Authenticates the SMTP client
-        private async Task AuthenticateSmtpClient(SmtpClient client, string password)
+        private async Task AuthenticateSmtpClient(SmtpClient client)
         {
-            string currentUserEmail = GetCurrentUserEmail();
-            string decryptedPassword = LoginUtils.DecryptPassword(password);
-            _logger.LogInformation("Authenticating as {UserEmail}", currentUserEmail);
+            string smtpUser = _configuration.GetValue<string>("EmailSettings:SmtpUser") ?? throw new InvalidOperationException("SMTP User is not configured.");
+            string smtpPass = _configuration.GetValue<string>("EmailSettings:SmtpPass") ?? throw new InvalidOperationException("SMTP Password is not configured.");
+
+            _logger.LogInformation("Authenticating with SMTP server as {UserEmail}", smtpUser);
             await client.ConnectAsync(GetSmtpConfiguration().smtpServer, GetSmtpConfiguration().smtpPort, GetSmtpConfiguration().enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
-            await client.AuthenticateAsync(currentUserEmail, decryptedPassword);
+            await client.AuthenticateAsync(smtpUser, smtpPass);
         }
 
-        // Creates the email message
-        private static MimeMessage CreateEmailMessage(EmailInput emailInput)
+        private MimeMessage CreateEmailMessage(EmailInputDto emailInput)
         {
             var message = new MimeMessage
             {
@@ -104,8 +100,7 @@ namespace AirwayAPI.Services
                 Subject = emailInput.Subject
             };
 
-            // Add CC recipients
-            if (emailInput.CCEmails != null)
+            if (emailInput.CCEmails != null && emailInput.CCEmails.Any())
             {
                 foreach (var ccEmail in emailInput.CCEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
                 {
@@ -113,21 +108,18 @@ namespace AirwayAPI.Services
                 }
             }
 
-            // Set email priority if marked as urgent
             if (emailInput.Urgent)
             {
-                message.Headers.Add("X-Priority", "1"); // Highest priority
+                message.Headers.Add("X-Priority", "1");
                 message.Headers.Add("X-MSMail-Priority", "High");
                 message.Headers.Add("Importance", "High");
             }
 
-            // Build the email body with styling
             var bodyBuilder = new BodyBuilder
             {
                 HtmlBody = ApplyEmailStyling(emailInput.HtmlBody)
             };
 
-            // Add attachments if any
             if (emailInput.Attachments != null)
             {
                 foreach (var attachmentPath in emailInput.Attachments.Where(path => !string.IsNullOrWhiteSpace(path)))
@@ -140,7 +132,6 @@ namespace AirwayAPI.Services
             return message;
         }
 
-        // Disconnects the SMTP client
         private async Task DisconnectSmtpClient(SmtpClient client)
         {
             if (client.IsConnected)
@@ -150,7 +141,6 @@ namespace AirwayAPI.Services
             }
         }
 
-        // Applies modern styling to the email body
         private static string ApplyEmailStyling(string bodyContent)
         {
             return $@"
@@ -211,21 +201,18 @@ namespace AirwayAPI.Services
                 </html>";
         }
 
-        // Gets the current user's email from claims
         private string GetCurrentUserEmail()
         {
-            var usernameClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-            if (usernameClaim != null && !string.IsNullOrEmpty(usernameClaim.Value))
+            var emailClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Email);
+            if (emailClaim != null && !string.IsNullOrEmpty(emailClaim.Value))
             {
-                string username = usernameClaim.Value;
-                string emailAddress = $"{username}@airway.com";
-                _logger.LogInformation("Constructed email from username: {Email}", emailAddress);
-                return emailAddress;
+                _logger.LogInformation("Current user email: {Email}", emailClaim.Value);
+                return emailClaim.Value;
             }
             else
             {
-                _logger.LogError("Current user's username not found in claims.");
-                throw new InvalidOperationException("User's username claim is missing.");
+                _logger.LogError("Current user's email not found in claims.");
+                throw new InvalidOperationException("User's email claim is missing.");
             }
         }
     }
