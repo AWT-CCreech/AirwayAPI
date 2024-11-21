@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.DataControllers.Purchasing
+namespace AirwayAPI.Controllers.UtilityControllers
 {
     [Authorize]
     [ApiController]

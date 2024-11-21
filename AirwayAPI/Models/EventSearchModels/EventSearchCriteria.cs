@@ -1,6 +1,6 @@
 ﻿namespace AirwayAPI.Models.EquipmentRequestModels
 {
-    public class EquipmentRequestSearchCriteria
+    public class EventSearchCriteria
     {
         public string? Company { get; set; }
         public string? Contact { get; set; }

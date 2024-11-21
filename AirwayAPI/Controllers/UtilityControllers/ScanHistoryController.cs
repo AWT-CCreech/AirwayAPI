@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.DataControllers.Inventory
+namespace AirwayAPI.Controllers.UtilityControllers
 {
     [Authorize]
     [ApiController]
@@ -36,7 +36,7 @@ namespace AirwayAPI.Controllers.DataControllers.Inventory
                                 PartNumber = er.PartNum,
                                 SerialNumber = sh.SerialNo,
                                 CustomerName = so != null ? so.CustomerName : null,
-                                RequiredDate = so != null ? so.RequiredDate : (DateTime?)null
+                                RequiredDate = so != null ? so.RequiredDate : null
                             };
 
                 // Apply filters if provided

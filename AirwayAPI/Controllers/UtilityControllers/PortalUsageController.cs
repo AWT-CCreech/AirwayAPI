@@ -1,11 +1,11 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.DataModels;
+using AirwayAPI.Models.UtilityModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.DataControllers.Analytics
+namespace AirwayAPI.Controllers.UtilityControllers
 {
     [Authorize]
     [ApiController]
@@ -16,7 +16,7 @@ namespace AirwayAPI.Controllers.DataControllers.Analytics
         private readonly ILogger<PortalUsageController> _logger = logger;
 
         [HttpPost("LogUsage")]
-        public async Task<IActionResult> LogUsage([FromBody] LogPortalUsageRequest request)
+        public async Task<IActionResult> LogUsage([FromBody] LogPortalUsageRequestDto request)
         {
             if (string.IsNullOrWhiteSpace(request.Url) || string.IsNullOrWhiteSpace(request.Username))
             {

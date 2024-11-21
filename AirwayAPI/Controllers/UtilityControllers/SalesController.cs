@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.DataControllers.Sales
+namespace AirwayAPI.Controllers.UtilityControllers
 {
     [Authorize]
     [ApiController]
@@ -22,11 +22,11 @@ namespace AirwayAPI.Controllers.DataControllers.Sales
             var reps = await (from u in _context.Users
                               join d in _context.Departments on u.DeptId equals d.Id
                               where
-                                  (d.Id == 2
+                                  d.Id == 2
                                    && u.ActiveSales == 1
                                    && u.Email != null
                                    && u.Email.Length > 1
-                                   && !u.Uname.Contains("house"))
+                                   && !u.Uname.Contains("house")
                                   || u.Uname == "JHerbst"
                               orderby u.Uname
                               select new

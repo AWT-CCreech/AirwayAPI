@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Controllers.UtilityControllers
+﻿namespace AirwayAPI.Models.UtilityModels
 {
     public class InventoryRulesResponseDto
     {

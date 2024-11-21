@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System;
 
-namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
+namespace AirwayAPI.Controllers.ReportControllers
 {
     [Authorize]
     [ApiController]
@@ -117,11 +117,11 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                         .OrderByDescending(s => s.OrderNum)
                         .Select(s => s.RequiredDate)
                         .FirstOrDefault(),
-                    IsDropShipment = (_context.QtSalesOrders
+                    IsDropShipment = _context.QtSalesOrders
                         .Where(q => q.RwsalesOrderNum == log.SalesOrderNum)
                         .OrderByDescending(q => q.SaleId)
                         .Select(q => q.DropShipment)
-                        .FirstOrDefault()) == true
+                        .FirstOrDefault() == true
                 });
 
             // Apply filtering based on user input
@@ -167,17 +167,17 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                     _logger.LogInformation("Applying POStatus filter: Late");
                     query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
                         (
-                            (l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
-                             l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value) ||
-                            (l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value && !l.ExpectedDelivery.HasValue)
+                            l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
+                             l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value ||
+                            l.PORequiredDate.HasValue && DateTime.Now > l.PORequiredDate.Value && !l.ExpectedDelivery.HasValue
                         ));
                     break;
                 case "due w/n 2 days":
                     _logger.LogInformation("Applying POStatus filter: Due w/n 2 days");
                     query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
                         (
-                            (l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2)) ||
-                            (l.PORequiredDate.HasValue && l.PORequiredDate.Value >= DateTime.Now && l.PORequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue)
+                            l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2) ||
+                            l.PORequiredDate.HasValue && l.PORequiredDate.Value >= DateTime.Now && l.PORequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue
                         ));
                     break;
             }
@@ -326,17 +326,17 @@ namespace AirwayAPI.Controllers.ReportControllers.PODeliveryLogControllers
                         _logger.LogInformation("Applying POStatus filter: Late");
                         query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
                             (
-                                (l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
-                                 l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value) ||
-                                (l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value && !l.ExpectedDelivery.HasValue)
+                                l.ExpectedDelivery.HasValue && DateTime.Now > l.ExpectedDelivery.Value &&
+                                 l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value ||
+                                l.RequiredDate.HasValue && DateTime.Now > l.RequiredDate.Value && !l.ExpectedDelivery.HasValue
                             ));
                         break;
                     case "due w/n 2 days":
                         _logger.LogInformation("Applying POStatus filter: Due w/n 2 days");
                         query = query.Where(l => l.QtyOrdered > l.QtyReceived && l.Postatus == 1 &&
                             (
-                                (l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2)) ||
-                                (l.RequiredDate.HasValue && l.RequiredDate.Value >= DateTime.Now && l.RequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue)
+                                l.ExpectedDelivery.HasValue && l.ExpectedDelivery.Value >= DateTime.Now && l.ExpectedDelivery.Value <= DateTime.Now.AddDays(2) ||
+                                l.RequiredDate.HasValue && l.RequiredDate.Value >= DateTime.Now && l.RequiredDate.Value <= DateTime.Now.AddDays(2) && !l.ExpectedDelivery.HasValue
                             ));
                         break;
                     default:
