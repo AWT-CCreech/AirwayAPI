@@ -38,6 +38,8 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 builder.Services.AddScoped<TokenService>();
 // Register the EmailService for dependency injection
 builder.Services.AddScoped<EmailService>();
+// Register the EquipmentRequestService for dependency injection
+builder.Services.AddScoped<EquipmentRequestService>();
 // Register IHttpContextAccessor to access HttpContext from service classes
 builder.Services.AddHttpContextAccessor();
 
