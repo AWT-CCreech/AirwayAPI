@@ -1,29 +1,34 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderWorkbenchController(
-        eHelpDeskContext context,
-        ILogger<SalesOrderWorkbenchController> logger) : ControllerBase
+    public class SalesOrderWorkbenchController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<SalesOrderWorkbenchController> _logger = logger;
+        private readonly eHelpDeskContext _context;
+        private readonly ILogger<SalesOrderWorkbenchController> _logger;
+
+        public SalesOrderWorkbenchController(eHelpDeskContext context, ILogger<SalesOrderWorkbenchController> logger)
+        {
+            _context = context;
+            _logger = logger;
+        }
 
         [HttpGet("EventLevelData")]
-        public async Task<IActionResult> GetEventLevelData(int? salesRepId, string? billToCompany, int? eventId)
+        public async Task<IActionResult> GetEventLevelData([FromQuery] int? salesRepId, [FromQuery] string? billToCompany, [FromQuery] int? eventId)
         {
             try
             {
                 var query = from so in _context.QtSalesOrders
-                            join mgr in _context.Users on so.AccountMgr equals mgr.Id into mgrJoin
-                            from mgr in mgrJoin.DefaultIfEmpty()
+                            join u in _context.Users on so.AccountMgr equals u.Id into userJoin
+                            from u in userJoin.DefaultIfEmpty()
                             where so.RwsalesOrderNum == "0" && so.Draft == false
                             select new
                             {
@@ -34,72 +39,85 @@ namespace AirwayAPI.Controllers.ReportControllers
                                 so.BillToCompanyName,
                                 so.SaleTotal,
                                 so.SaleDate,
-                                SalesRep = mgr.Uname
+                                so.AccountMgr, // for filtering
+                                SalesRep = u != null ? u.Uname : "N/A"
                             };
 
-                if (eventId.HasValue && eventId != 0)
-                    query = query.Where(q => q.EventId == eventId);
+                if (eventId.HasValue && eventId.Value != 0)
+                {
+                    query = query.Where(q => q.EventId == eventId.Value);
+                }
                 else
                 {
-                    if (salesRepId.HasValue && salesRepId != 0)
-                        query = query.Where(q => q.SaleId == salesRepId);
+                    if (salesRepId.HasValue && salesRepId.Value != 0)
+                        query = query.Where(q => q.AccountMgr == salesRepId.Value);
+
                     if (!string.IsNullOrWhiteSpace(billToCompany))
-                        query = query.Where(q => EF.Functions.Like(q.BillToCompanyName, $"{billToCompany}%"));
+                        query = query.Where(q => q.BillToCompanyName.StartsWith(billToCompany));
                 }
 
-                var result = await query.OrderBy(q => q.EventId).ToListAsync();
+                var result = await query
+                    .OrderBy(q => q.EventId)
+                    .ToListAsync();
+
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in GetEventLevelData: {ex.Message}");
+                _logger.LogError($"Error in GetEventLevelData: {ex.Message}", ex);
                 return StatusCode(500, "Error fetching Event Level Data");
             }
         }
 
         [HttpGet("DetailLevelData")]
-        public async Task<IActionResult> GetDetailLevelData(int? salesRepId, string? billToCompany, int? eventId)
+        public async Task<IActionResult> GetDetailLevelData([FromQuery] int? salesRepId, [FromQuery] string? billToCompany, [FromQuery] int? eventId)
         {
             try
             {
-                var query = from detail in _context.QtSalesOrderDetails
-                            join order in _context.QtSalesOrders on detail.SaleId equals order.SaleId
-                            join mgr in _context.Users on order.AccountMgr equals mgr.Id into mgrJoin
-                            from mgr in mgrJoin.DefaultIfEmpty()
-                            where detail.Soflag == true
+                var query = from d in _context.QtSalesOrderDetails
+                            join so in _context.QtSalesOrders on d.SaleId equals so.SaleId
+                            join u in _context.Users on so.AccountMgr equals u.Id into userJoin
+                            from u in userJoin.DefaultIfEmpty()
+                            where d.Soflag == true
                             select new
                             {
-                                detail.Id,
-                                detail.RequestId,
-                                detail.QtySold,
-                                detail.UnitMeasure,
-                                detail.PartNum,
-                                detail.PartDesc,
-                                detail.UnitPrice,
-                                detail.ExtendedPrice,
-                                SalesRep = mgr.Uname,
-                                order.RwsalesOrderNum,
-                                order.EventId,
-                                order.AccountMgr,
-                                order.BillToCompanyName
+                                d.Id,
+                                d.RequestId,
+                                d.QtySold,
+                                d.UnitMeasure,
+                                d.PartNum,
+                                d.PartDesc,
+                                d.UnitPrice,
+                                d.ExtendedPrice,
+                                so.RwsalesOrderNum,
+                                so.EventId,
+                                so.BillToCompanyName,
+                                AccountMgr = so.AccountMgr, // for filtering
+                                SalesRep = u != null ? $"{u.Lname}, {u.Fname.Substring(0, 1)}" : "N/A"
                             };
 
-                if (eventId.HasValue && eventId != 0)
-                    query = query.Where(q => q.EventId == eventId);
+                if (eventId.HasValue && eventId.Value != 0)
+                {
+                    query = query.Where(q => q.EventId == eventId.Value);
+                }
                 else
                 {
-                    if (salesRepId.HasValue && salesRepId != 0)
-                        query = query.Where(q => q.AccountMgr == salesRepId);
+                    if (salesRepId.HasValue && salesRepId.Value != 0)
+                        query = query.Where(q => q.AccountMgr == salesRepId.Value);
+
                     if (!string.IsNullOrWhiteSpace(billToCompany))
-                        query = query.Where(q => EF.Functions.Like(q.BillToCompanyName, $"{billToCompany}%"));
+                        query = query.Where(q => q.BillToCompanyName.StartsWith(billToCompany));
                 }
 
-                var result = await query.OrderBy(q => q.RequestId).ToListAsync();
+                var result = await query
+                    .OrderBy(q => q.RequestId)
+                    .ToListAsync();
+
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in GetDetailLevelData: {ex.Message}");
+                _logger.LogError($"Error in GetDetailLevelData: {ex.Message}", ex);
                 return StatusCode(500, "Error fetching Detail Level Data");
             }
         }
