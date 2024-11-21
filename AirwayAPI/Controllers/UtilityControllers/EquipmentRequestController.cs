@@ -1,6 +1,5 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
-using AirwayAPI.Models.UtilityModels;
+using AirwayAPI.Models.DTOs;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,14 +10,21 @@ namespace AirwayAPI.Controllers.UtilityControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class EquipmentRequestController(
-        eHelpDeskContext context,
-        ILogger<EquipmentRequestController> logger,
-        EquipmentRequestService equipmentRequestService) : ControllerBase
+    public class EquipmentRequestController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<EquipmentRequestController> _logger = logger;
-        private readonly EquipmentRequestService _equipmentRequestService = equipmentRequestService;
+        private readonly IEquipmentRequestService _equipmentRequestService;
+        private readonly ILogger<EquipmentRequestController> _logger;
+        private readonly eHelpDeskContext _context;
+
+        public EquipmentRequestController(
+            IEquipmentRequestService equipmentRequestService,
+            ILogger<EquipmentRequestController> logger,
+            eHelpDeskContext context)
+        {
+            _equipmentRequestService = equipmentRequestService;
+            _logger = logger;
+            _context = context;
+        }
 
         [HttpPost("Update")]
         public async Task<IActionResult> UpdateEquipmentRequest([FromBody] EquipmentRequestUpdateDto request)
@@ -26,29 +32,39 @@ namespace AirwayAPI.Controllers.UtilityControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var detail = await _context.QtSalesOrderDetails
-                    .FirstOrDefaultAsync(d => d.Id == request.Id);
+                // Fetch the SalesOrderDetail by Id
+                var detail = await _equipmentRequestService.GetSalesOrderDetailByIdAsync(request.Id);
                 if (detail == null)
-                    return NotFound("Sales order detail not found.");
+                    return NotFound($"QtSalesOrderDetail with Id {request.Id} not found.");
 
-                await _equipmentRequestService.ProcessEquipmentRequest(detail, new SalesOrderUpdateDto
+                // Create SalesOrderUpdateDto based on EquipmentRequestUpdateDto
+                var salesOrderUpdateDto = new SalesOrderUpdateDto
                 {
-                    SaleId = (int)detail.SaleId,
+                    SaleId = detail.SaleId ?? 0, // Ensure SaleId is not null
+                    EventId = 0, // To be set based on related SalesOrder
+                    QuoteId = 0, // To be set based on related SalesOrder
                     RWSalesOrderNum = request.RWSalesOrderNum,
-                    Username = request.Username,
-                    DropShipment = request.DropShipment
-                });
+                    DropShipment = request.DropShipment,
+                    Username = request.Username
+                };
 
-                await transaction.CommitAsync();
+                // Fetch the related SalesOrder to set EventId and QuoteId
+                var salesOrder = await _context.QtSalesOrders.FirstOrDefaultAsync(so => so.SaleId == salesOrderUpdateDto.SaleId);
+                if (salesOrder != null)
+                {
+                    salesOrderUpdateDto.EventId = salesOrder.EventId ?? 0;
+                    salesOrderUpdateDto.QuoteId = salesOrder.QuoteId ?? 0;
+                }
+
+                await _equipmentRequestService.ProcessEquipmentRequest(detail, salesOrderUpdateDto);
+
                 return Ok("Equipment request updated successfully.");
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                _logger.LogError($"Error updating Equipment Request: {ex.Message}");
+                _logger.LogError($"Error updating Equipment Request: {ex.Message}", ex);
                 return StatusCode(500, "Error updating Equipment Request");
             }
         }
