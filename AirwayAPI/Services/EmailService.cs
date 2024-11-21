@@ -8,24 +8,14 @@ using System.Security.Claims;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService
+    public class EmailService(
+        ILogger<EmailService> logger,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor)
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<EmailService> _logger;
-        private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public EmailService(
-            eHelpDeskContext context,
-            ILogger<EmailService> logger,
-            IConfiguration configuration,
-            IHttpContextAccessor httpContextAccessor)
-        {
-            _context = context;
-            _logger = logger;
-            _configuration = configuration;
-            _httpContextAccessor = httpContextAccessor;
-        }
+        private readonly ILogger<EmailService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
         // Centralized method to send emails
         public async Task SendEmailAsync(EmailInput emailInput)
@@ -83,13 +73,13 @@ namespace AirwayAPI.Services
             {
                 string currentUserEmail = GetCurrentUserEmail();
                 emailInput.ToEmail = currentUserEmail;
-                emailInput.CCEmails = new List<string>();
+                emailInput.CCEmails = [];
                 _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
             }
         }
 
         // Configures the SMTP client
-        private void ConfigureSmtpClient(SmtpClient client, bool enableSsl)
+        private static void ConfigureSmtpClient(SmtpClient client, bool enableSsl)
         {
             client.ServerCertificateValidationCallback = (s, c, h, e) => true; // Handle SSL certificate validation
         }
@@ -105,7 +95,7 @@ namespace AirwayAPI.Services
         }
 
         // Creates the email message
-        private MimeMessage CreateEmailMessage(EmailInput emailInput)
+        private static MimeMessage CreateEmailMessage(EmailInput emailInput)
         {
             var message = new MimeMessage
             {
