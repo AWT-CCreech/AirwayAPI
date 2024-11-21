@@ -12,8 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    // Alternatively, use null to keep PascalCase
-    // options.JsonSerializerOptions.PropertyNamingPolicy = null;
+// Alternatively, use null to keep PascalCase
+// options.JsonSerializerOptions.PropertyNamingPolicy = null;
 );
 
 // Configure CORS to allow specific origins, methods, and headers
@@ -28,18 +28,18 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Registering the DbContext with dependency injection
+// Registering the DbContext with dependency injection as Scoped (default)
 builder.Services.AddDbContext<eHelpDeskContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-}, ServiceLifetime.Transient);
+});
 
-// Register the TokenService for dependency injection
-builder.Services.AddScoped<TokenService>();
-// Register the EmailService for dependency injection
-builder.Services.AddScoped<EmailService>();
-// Register the EquipmentRequestService for dependency injection
-builder.Services.AddScoped<EquipmentRequestService>();
+// Register services with their corresponding interfaces
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IEquipmentRequestService, EquipmentRequestService>();
+builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+
 // Register IHttpContextAccessor to access HttpContext from service classes
 builder.Services.AddHttpContextAccessor();
 
