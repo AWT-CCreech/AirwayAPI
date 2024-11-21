@@ -16,17 +16,17 @@ namespace AirwayAPI.Controllers
     {
         private readonly eHelpDeskContext _context;
         private readonly ILogger<UserLoginsController> _logger;
-        private readonly TokenService _tokenService; // Inject TokenService
-        private static readonly string[] predefinedUserArray = new[] { "mgibson", "lvonder", "kgildersleeve" };
+        private readonly ITokenService _tokenService; // Inject ITokenService
+        private static readonly string[] predefinedUserArray = ["mgibson", "lvonder", "kgildersleeve"];
 
         public UserLoginsController(
             eHelpDeskContext context,
             ILogger<UserLoginsController> logger,
-            TokenService tokenService) // Inject TokenService
+            ITokenService tokenService) // Inject ITokenService
         {
             _context = context;
             _logger = logger;
-            _tokenService = tokenService; // Assign TokenService
+            _tokenService = tokenService; // Assign ITokenService
         }
 
         [HttpPost]
