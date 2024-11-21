@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace AirwayAPI.Models;
+﻿namespace AirwayAPI.Models;
 
 public partial class EquipmentRequest
 {
@@ -134,7 +131,11 @@ public partial class EquipmentRequest
     public bool? TechWbreqForSo { get; set; }
 
     /// <summary>
-    /// added this b/c of the new report showing calls made on requests but still having to find qty; once a req hits the WB needing qty found it still stays on there so they can make more calls but for reporting purposes we don&apos;t need to include these so this flag will help leave them off the report
+    /// added this b/c of the new report showing calls made on requests 
+    /// but still having to find qty; once a req hits the WB needing qty 
+    /// found it still stays on there so they can make more calls but for 
+    /// reporting purposes we dont need to include these so this flag will
+    /// help leave them off the report
     /// </summary>
     public bool? ZeroLeftToFind { get; set; }
 
