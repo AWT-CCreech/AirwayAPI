@@ -10,21 +10,14 @@ namespace AirwayAPI.Controllers.UtilityControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class EquipmentRequestController : ControllerBase
+    public class EquipmentRequestController(
+        IEquipmentRequestService equipmentRequestService,
+        ILogger<EquipmentRequestController> logger,
+        eHelpDeskContext context) : ControllerBase
     {
-        private readonly IEquipmentRequestService _equipmentRequestService;
-        private readonly ILogger<EquipmentRequestController> _logger;
-        private readonly eHelpDeskContext _context;
-
-        public EquipmentRequestController(
-            IEquipmentRequestService equipmentRequestService,
-            ILogger<EquipmentRequestController> logger,
-            eHelpDeskContext context)
-        {
-            _equipmentRequestService = equipmentRequestService;
-            _logger = logger;
-            _context = context;
-        }
+        private readonly IEquipmentRequestService _equipmentRequestService = equipmentRequestService;
+        private readonly ILogger<EquipmentRequestController> _logger = logger;
+        private readonly eHelpDeskContext _context = context;
 
         [HttpPost("Update")]
         public async Task<IActionResult> UpdateEquipmentRequest([FromBody] EquipmentRequestUpdateDto request)
@@ -64,7 +57,7 @@ namespace AirwayAPI.Controllers.UtilityControllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error updating Equipment Request: {ex.Message}", ex);
+                _logger.LogError("Error updating Equipment Request: {ex.Message}", ex);
                 return StatusCode(500, "Error updating Equipment Request");
             }
         }
