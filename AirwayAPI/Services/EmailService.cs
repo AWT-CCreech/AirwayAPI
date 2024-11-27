@@ -6,21 +6,14 @@ using System.Security.Claims;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService : IEmailService
+    public class EmailService(
+        ILogger<EmailService> logger,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor) : IEmailService
     {
-        private readonly ILogger<EmailService> _logger;
-        private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public EmailService(
-            ILogger<EmailService> logger,
-            IConfiguration configuration,
-            IHttpContextAccessor httpContextAccessor)
-        {
-            _logger = logger;
-            _configuration = configuration;
-            _httpContextAccessor = httpContextAccessor;
-        }
+        private readonly ILogger<EmailService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
         public async Task SendEmailAsync(EmailInputDto emailInput)
         {
@@ -71,7 +64,7 @@ namespace AirwayAPI.Services
             {
                 string currentUserEmail = GetCurrentUserEmail();
                 emailInput.ToEmail = currentUserEmail;
-                emailInput.CCEmails = new List<string>();
+                emailInput.CCEmails = [];
                 _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
             }
         }
