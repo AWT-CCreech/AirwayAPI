@@ -2,24 +2,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
-using System.Linq;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderWorkbenchController : ControllerBase
+    public class SalesOrderWorkbenchController(eHelpDeskContext context, ILogger<SalesOrderWorkbenchController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<SalesOrderWorkbenchController> _logger;
-
-        public SalesOrderWorkbenchController(eHelpDeskContext context, ILogger<SalesOrderWorkbenchController> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<SalesOrderWorkbenchController> _logger = logger;
 
         [HttpGet("EventLevelData")]
         public async Task<IActionResult> GetEventLevelData([FromQuery] int? salesRepId, [FromQuery] string? billToCompany, [FromQuery] int? eventId)
@@ -64,7 +56,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in GetEventLevelData: {ex.Message}", ex);
+                _logger.LogError("Error in GetEventLevelData: {ex.Message}", ex);
                 return StatusCode(500, "Error fetching Event Level Data");
             }
         }
@@ -92,8 +84,8 @@ namespace AirwayAPI.Controllers.ReportControllers
                                 so.RwsalesOrderNum,
                                 so.EventId,
                                 so.BillToCompanyName,
-                                AccountMgr = so.AccountMgr, // for filtering
-                                SalesRep = u != null ? $"{u.Lname}, {u.Fname.Substring(0, 1)}" : "N/A"
+                                so.AccountMgr, // for filtering
+                                SalesRep = u != null ? u.Uname : "N/A"
                             };
 
                 if (eventId.HasValue && eventId.Value != 0)
@@ -117,7 +109,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in GetDetailLevelData: {ex.Message}", ex);
+                _logger.LogError("Error in GetDetailLevelData: {ex.Message}", ex);
                 return StatusCode(500, "Error fetching Detail Level Data");
             }
         }
