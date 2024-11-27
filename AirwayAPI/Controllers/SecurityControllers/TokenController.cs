@@ -10,16 +10,10 @@ namespace AirwayAPI.Controllers.SecurityControllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class TokenController : ControllerBase
+    public class TokenController(TokenService tokenService, ILogger<TokenController> logger) : ControllerBase
     {
-        private readonly TokenService _tokenService;
-        private readonly ILogger<TokenController> _logger; // Add logger
-
-        public TokenController(TokenService tokenService, ILogger<TokenController> logger) // Inject logger
-        {
-            _tokenService = tokenService;
-            _logger = logger;
-        }
+        private readonly TokenService _tokenService = tokenService;
+        private readonly ILogger<TokenController> _logger = logger; // Add logger
 
         [HttpPost("RefreshToken")]
         public IActionResult RefreshToken([FromBody] TokenRefreshRequest tokenRefreshRequest)
