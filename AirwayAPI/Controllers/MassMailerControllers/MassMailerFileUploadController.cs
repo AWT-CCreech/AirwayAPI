@@ -40,7 +40,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
             try
             {
                 var files = Request.Form.Files;
-                List<string> fileNames = new();
+                List<string> fileNames = [];
                 var folderName = Path.Combine("Files", "MassMailerAttachment", Request.Form["username"].ToString().Trim().ToLower());
                 var path = Path.Combine(Directory.GetCurrentDirectory(), folderName);
                
