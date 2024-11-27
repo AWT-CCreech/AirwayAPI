@@ -9,24 +9,16 @@ using System.Collections.Generic;
 
 namespace AirwayAPI.Services
 {
-    public class SalesOrderService : ISalesOrderService
+    public class SalesOrderService(
+        eHelpDeskContext context,
+        IEquipmentRequestService equipmentRequestService,
+        IEmailService emailService,
+        ILogger<SalesOrderService> logger) : ISalesOrderService
     {
-        private readonly eHelpDeskContext _context;
-        private readonly IEquipmentRequestService _equipmentRequestService;
-        private readonly IEmailService _emailService;
-        private readonly ILogger<SalesOrderService> _logger;
-
-        public SalesOrderService(
-            eHelpDeskContext context,
-            IEquipmentRequestService equipmentRequestService,
-            IEmailService emailService,
-            ILogger<SalesOrderService> logger)
-        {
-            _context = context;
-            _equipmentRequestService = equipmentRequestService;
-            _emailService = emailService;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly IEquipmentRequestService _equipmentRequestService = equipmentRequestService;
+        private readonly IEmailService _emailService = emailService;
+        private readonly ILogger<SalesOrderService> _logger = logger;
 
         public async Task UpdateSalesOrderAsync(SalesOrderUpdateDto request)
         {
@@ -34,10 +26,7 @@ namespace AirwayAPI.Services
             try
             {
                 var salesOrder = await _context.QtSalesOrders
-                    .FirstOrDefaultAsync(so => so.SaleId == request.SaleId);
-
-                if (salesOrder == null)
-                    throw new Exception($"Sales order with SaleId {request.SaleId} not found.");
+                    .FirstOrDefaultAsync(so => so.SaleId == request.SaleId) ?? throw new Exception($"Sales order with SaleId {request.SaleId} not found.");
 
                 // Update Sales Order
                 salesOrder.RwsalesOrderNum = request.RWSalesOrderNum.Replace(";", ",");
@@ -155,7 +144,7 @@ namespace AirwayAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error in UpdateSalesOrderAsync: {ex.Message}", ex);
+                _logger.LogError("Error in UpdateSalesOrderAsync: {ex.Message}", ex);
                 await transaction.RollbackAsync();
                 throw;
             }
