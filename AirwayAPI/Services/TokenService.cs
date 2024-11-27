@@ -7,16 +7,10 @@ using System.Text;
 
 namespace AirwayAPI.Services
 {
-    public class TokenService : ITokenService
+    public class TokenService(IConfiguration configuration, ILogger<TokenService> logger) : ITokenService
     {
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<TokenService> _logger;
-
-        public TokenService(IConfiguration configuration, ILogger<TokenService> logger)
-        {
-            _configuration = configuration;
-            _logger = logger;
-        }
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ILogger<TokenService> _logger = logger;
 
         public string GenerateJwtToken(string username)
         {
