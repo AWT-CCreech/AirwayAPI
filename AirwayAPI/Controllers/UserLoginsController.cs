@@ -12,22 +12,15 @@ namespace AirwayAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserLoginsController : ControllerBase
+    public class UserLoginsController(
+        eHelpDeskContext context,
+        ILogger<UserLoginsController> logger,
+        ITokenService tokenService) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<UserLoginsController> _logger;
-        private readonly ITokenService _tokenService; // Inject ITokenService
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<UserLoginsController> _logger = logger;
+        private readonly ITokenService _tokenService = tokenService; // Inject ITokenService
         private static readonly string[] predefinedUserArray = ["mgibson", "lvonder", "kgildersleeve"];
-
-        public UserLoginsController(
-            eHelpDeskContext context,
-            ILogger<UserLoginsController> logger,
-            ITokenService tokenService) // Inject ITokenService
-        {
-            _context = context;
-            _logger = logger;
-            _tokenService = tokenService; // Assign ITokenService
-        }
 
         [HttpPost]
         public async Task<ActionResult<LoginInfo>> GetUsers([FromBody] LoginInfo login)
