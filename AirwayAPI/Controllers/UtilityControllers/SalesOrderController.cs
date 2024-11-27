@@ -8,16 +8,10 @@ namespace AirwayAPI.Controllers.UtilityControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderController : ControllerBase
+    public class SalesOrderController(ISalesOrderService salesOrderService, ILogger<SalesOrderController> logger) : ControllerBase
     {
-        private readonly ISalesOrderService _salesOrderService;
-        private readonly ILogger<SalesOrderController> _logger;
-
-        public SalesOrderController(ISalesOrderService salesOrderService, ILogger<SalesOrderController> logger)
-        {
-            _salesOrderService = salesOrderService;
-            _logger = logger;
-        }
+        private readonly ISalesOrderService _salesOrderService = salesOrderService;
+        private readonly ILogger<SalesOrderController> _logger = logger;
 
         [HttpPost("Update")]
         public async Task<IActionResult> UpdateSalesOrder([FromBody] SalesOrderUpdateDto request)
@@ -32,7 +26,7 @@ namespace AirwayAPI.Controllers.UtilityControllers
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error updating sales order: {ex.Message}", ex);
+                _logger.LogError("Error updating sales order: {ex.Message}", ex);
                 return StatusCode(500, "An error occurred while updating the sales order.");
             }
         }
