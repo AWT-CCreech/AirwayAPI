@@ -88,8 +88,10 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                 var folderName = Path.Combine("Files", "MassMailerAttachment", normalizedSenderUserName);
 
-                foreach (string fileName in input.AttachFiles ?? Array.Empty<string>())
+                string[] array = input.AttachFiles ?? [];
+                for (int i = 0; i < array.Length; i++)
                 {
+                    string fileName = array[i];
                     if (!string.IsNullOrWhiteSpace(fileName))
                     {
                         var fullPath = Path.Combine(Directory.GetCurrentDirectory(), folderName, fileName);
@@ -97,7 +99,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                     }
                 }
 
-                string[] logos = { "image1.png", "image2.png", "image3.png", "image4.png", "image5.png" };
+                string[] logos = ["image1.png", "image2.png", "image3.png", "image4.png", "image5.png"];
                 var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Files", "Logos");
 
                 for (int i = 0; i < logos.Length; ++i)
