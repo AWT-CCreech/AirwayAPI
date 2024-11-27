@@ -10,14 +10,9 @@ namespace AirwayAPI.Controllers.UserControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class UserListController : ControllerBase
+    public class UserListController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public UserListController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
+        private readonly eHelpDeskContext _context = context;
 
         /// <summary>
         /// Retrieves a list of active users with their details, including uname, first name, last name,
