@@ -8,15 +8,9 @@ namespace AirwayAPI.Controllers.TrakkerControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class TrakkerController : ControllerBase
+    public class TrakkerController(eHelpDeskContext context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-
-        public TrakkerController(eHelpDeskContext context)
-        {
-            _context = context;
-        }
-
+        private readonly eHelpDeskContext _context = context;
 
         [HttpGet("Companies")]
         public async Task<IActionResult> GetCompanies()
