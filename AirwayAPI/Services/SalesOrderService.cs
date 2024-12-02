@@ -1,11 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 
 namespace AirwayAPI.Services
 {
