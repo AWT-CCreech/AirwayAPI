@@ -31,21 +31,21 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 SmtpClient client = new();
                 await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
 
-                if (string.IsNullOrWhiteSpace(input?.SenderUserName) || string.IsNullOrWhiteSpace(input?.Password))
+                if (string.IsNullOrWhiteSpace(input?.UserName) || string.IsNullOrWhiteSpace(input?.Password))
                 {
-                    throw new ArgumentNullException($"{input?.SenderUserName} and {input?.Password} cannot be null");
+                    throw new ArgumentNullException($"{input?.UserName} and {input?.Password} cannot be null");
                 }
 
-                string senderUserName = input.SenderUserName.Trim().ToLower();
-                string email = senderUserName == "lvonderporten" ? "lvonder@airway.com" : senderUserName + "@airway.com";
+                string UserName = input.UserName.Trim().ToLower();
+                string email = UserName == "lvonderporten" ? "lvonder@airway.com" : UserName + "@airway.com";
 
                 await client.AuthenticateAsync(email, LoginUtils.DecryptPassword(input.Password));
 
                 User? senderInfo;
-                var normalizedSenderUserName = input.SenderUserName.Trim().ToLower();
+                var normalizedUserName = input.UserName.Trim().ToLower();
 
                 senderInfo = await _context.Users
-                    .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == (normalizedSenderUserName == "lvonder" ? "lvonderporten" : normalizedSenderUserName))
+                    .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == (normalizedUserName == "lvonder" ? "lvonderporten" : normalizedUserName))
                     .FirstOrDefaultAsync();
 
                 if (senderInfo == null)
@@ -54,7 +54,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 }
 
                 string senderFullname = (senderInfo.Fname ?? string.Empty) + " " + (senderInfo.Lname ?? string.Empty);
-                if (normalizedSenderUserName == "lvonderporten")
+                if (normalizedUserName == "lvonderporten")
                 {
                     senderFullname = "Linda Von der Porten";
                 }
@@ -63,16 +63,19 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                 message.From.Add(new MailboxAddress(senderFullname, email));
 
-                if (input.CCEmails?.Length != input.CCNames?.Length)
+                if (input.CCEmails?.Count != input.CCNames?.Count)
                 {
                     throw new ArgumentException("CCEmails and CCNames must have the same length");
                 }
 
-                for (int j = 0; j < input.CCEmails.Length; ++j)
+                if (input.CCEmails != null && input.CCNames != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(input.CCEmails[j]) && !string.IsNullOrWhiteSpace(input.CCNames[j]))
+                    for (int j = 0; j < input.CCEmails.Count; ++j)
                     {
-                        message.Cc.Add(new MailboxAddress(input.CCNames[j].Trim(), input.CCEmails[j].Trim()));
+                        if (!string.IsNullOrWhiteSpace(input.CCEmails[j]) && !string.IsNullOrWhiteSpace(input.CCNames[j]))
+                        {
+                            message.Cc.Add(new MailboxAddress(input.CCNames[j].Trim(), input.CCEmails[j].Trim()));
+                        }
                     }
                 }
 
@@ -86,10 +89,10 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                                             .Replace("%%DIRECT%%", senderInfo.DirectPhone)
                                             .Replace("%%MOBILE%%", senderInfo.MobilePhone);
 
-                var folderName = Path.Combine("Files", "MassMailerAttachment", normalizedSenderUserName);
+                var folderName = Path.Combine("Files", "MassMailerAttachment", normalizedUserName);
 
-                string[] array = input.AttachFiles ?? [];
-                for (int i = 0; i < array.Length; i++)
+                List<string> array = input.Attachments ?? [];
+                for (int i = 0; i < array.Count; i++)
                 {
                     string fileName = array[i];
                     if (!string.IsNullOrWhiteSpace(fileName))
@@ -119,18 +122,18 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                 _context.Database.ExecuteSqlRaw(commandText, new[] { desc, date, userId, massMailId });
 
-                for (int i = 0; i < input.RecipientEmails.Length; ++i)
+                for (int i = 0; i < input.ToEmails.Count; ++i)
                 {
-                    if (string.IsNullOrWhiteSpace(input.RecipientEmails[i]) || string.IsNullOrWhiteSpace(input.RecipientCompanies[i]) || string.IsNullOrWhiteSpace(input.RecipientNames[i]))
+                    if (string.IsNullOrWhiteSpace(input.ToEmails[i]) || string.IsNullOrWhiteSpace(input.RecipientCompanies[i]) || string.IsNullOrWhiteSpace(input.RecipientNames[i]))
                     {
                         throw new ArgumentNullException("Recipient fields cannot contain null or whitespace values");
                     }
 
                     var items = new List<MassMailerPartItem>();
 
-                    for (var j = 0; j < input.items.Length; ++j)
+                    for (var j = 0; j < input.Items.Count; ++j)
                     {
-                        var item = input.items[j];
+                        var item = input.Items[j];
                         if (item == null) continue;
 
                         var check = await (from c in _context.SellOpCompetitors
@@ -189,7 +192,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                         _context.CamActivities.Add(new CamActivity
                         {
                             ContactId = input.RecipientIds[i],
-                            ActivityOwner = input.SenderUserName,
+                            ActivityOwner = input.UserName,
                             ActivityType = "CallOut",
                             Notes = "<b>Mass Mail Sent For:</b> " + input.Subject.Replace("'", "''"),
                             ActivityDate = DateTime.Now
@@ -211,7 +214,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                         }
                         else
                         {
-                            message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.RecipientEmails[i].Trim()));
+                            message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.ToEmails[i].Trim()));
                         }
 
                         var partTable = "";
