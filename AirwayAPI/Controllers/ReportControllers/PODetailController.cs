@@ -1,6 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -12,11 +13,18 @@ namespace AirwayAPI.Controllers.ReportControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PODetailController(eHelpDeskContext context, EmailService emailService, ILogger<PODetailController> logger) : ControllerBase
+    public class PODetailController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly EmailService _emailService = emailService;
-        private readonly ILogger<PODetailController> _logger = logger;
+        private readonly eHelpDeskContext _context;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<PODetailController> _logger;
+
+        public PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger) // Use the interface here
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         // GET: api/PODetail/id/{id}
         [HttpGet("id/{id}")]
@@ -207,7 +215,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                         {
                             var emailInput = new PODetailEmailInput
                             {
-                                ToEmail = salesRep.Email,
+                                ToEmails = [salesRep.Email],
                                 SoNum = poLogEntry.SalesOrderNum ?? "Unknown SO",
                                 SalesRep = salesRep.Uname ?? "Sales Representative",
                                 CompanyName = salesOrder.ShipToCompanyName ?? "Unknown Company",
@@ -240,7 +248,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
         private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
         {
-            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmail);
+            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmails);
             try
             {
                 // Prepare the email body content
@@ -256,12 +264,12 @@ namespace AirwayAPI.Controllers.ReportControllers
                         {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
                     </table>";
 
-                var email = new EmailInputDto
+                var email = new EmailInputBase
                 {
                     FromEmail = null, // Update sendAs permissions if needed
-                    ToEmail = emailInput.ToEmail,
+                    ToEmails = emailInput.ToEmails,
                     Subject = emailInput.Subject,
-                    HtmlBody = emailBody,
+                    Body = emailBody,
                     UserName = updateDto.UserName,
                     Password = updateDto.Password,
                     CCEmails = [],
