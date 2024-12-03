@@ -1,23 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using AirwayAPI.Models.EmailModels;
 
 namespace AirwayAPI.Models.MassMailerModels
 {
-    public class MassMailerEmailInput
+    public class MassMailerEmailInput : EmailInputBase
     {
-        public string Subject { get; set; }
-        public string Body { get; set; }
-        public string SenderUserName { get; set; }
-        public int[] RecipientIds { get; set; }
-        public string[] RecipientEmails { get; set; }
-        public string[] RecipientNames { get; set; }
-        public string[] RecipientCompanies { get; set; }
-        public string[] AttachFiles { get; set; }
-        public string Password { get; set; }
-        public string[] CCEmails { get; set; }
-        public string[] CCNames { get; set; }
-        public MassMailerPartItem[] items { get; set; }
+        public List<int> RecipientIds { get; set; } = new List<int>();
+        public List<string> RecipientNames { get; set; } = new List<string>();
+        public List<string> RecipientCompanies { get; set; } = new List<string>();
+        public List<string> CCNames { get; set; } = new List<string>();
+        public List<MassMailerPartItem> Items { get; set; } = new List<MassMailerPartItem>();
     }
 }
