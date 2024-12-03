@@ -1,5 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.EmailModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Services
@@ -42,16 +43,16 @@ namespace AirwayAPI.Services
                 // EMAIL NOTIFICATIONS
 
                 // EMAIL for Verizon SO
-                bool isVerizon = salesOrder.BillToCompanyName.StartsWith("VERIZON");
+                bool isVerizon = salesOrder.BillToCompanyName?.StartsWith("VERIZON") ?? false;
 
                 if (isVerizon)
                 {
-                    await _emailService.SendEmailAsync(new EmailInputDto
+                    await _emailService.SendEmailAsync(new EmailInputBase
                     {
                         FromEmail = "ITDept@airway.com",
-                        ToEmail = "ccreech@airway.com",
-                        Subject = $"A Verizon SO has been assigned to Event ID {request.EventId}",
-                        HtmlBody = $"SO Number(s): {request.RWSalesOrderNum}"
+                        ToEmails = ["ccreech@airway.com"],
+                        Subject = $"Verizon SO assigned to EID#{request.EventId}",
+                        Body = $"SO Number(s): {request.RWSalesOrderNum}"
                     });
                 }
 
@@ -64,12 +65,12 @@ namespace AirwayAPI.Services
 
                     if (hasEmailNotification)
                     {
-                        await _emailService.SendEmailAsync(new EmailInputDto
+                        await _emailService.SendEmailAsync(new EmailInputBase
                         {
                             FromEmail = "ITDept@airway.com",
-                            ToEmail = "ccreech@airway.com",
-                            Subject = $"A {salesOrder.BillToCompanyName} SO has been assigned to Event ID {request.EventId}",
-                            HtmlBody = $"SO Number(s): {request.RWSalesOrderNum}"
+                            ToEmails = ["ccreech@airway.com"],
+                            Subject = $"SO assigned to EID#{request.EventId} [{salesOrder.BillToCompanyName}]",
+                            Body = $"SO Number(s): {request.RWSalesOrderNum}"
                         });
                     }
 
@@ -111,12 +112,12 @@ namespace AirwayAPI.Services
 
                         foreach (var email in ccEmails)
                         {
-                            await _emailService.SendEmailAsync(new EmailInputDto
+                            await _emailService.SendEmailAsync(new EmailInputBase
                             {
                                 FromEmail = "ITDept@airway.com",
-                                ToEmail = email,
+                                ToEmails = [email],
                                 Subject = subject,
-                                HtmlBody = body,
+                                Body = body,
                                 Urgent = true
                             });
                         }
