@@ -1,4 +1,4 @@
-﻿using AirwayAPI.Models.DTOs;
+﻿using AirwayAPI.Models.EmailModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -15,9 +15,9 @@ namespace AirwayAPI.Services
         private readonly IConfiguration _configuration = configuration;
         private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
-        public async Task SendEmailAsync(EmailInputDto emailInput)
+        public async Task SendEmailAsync(EmailInputBase emailInput)
         {
-            _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmail);
+            _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmails);
 
             var (smtpServer, smtpPort, enableSsl) = GetSmtpConfiguration();
 
@@ -33,7 +33,7 @@ namespace AirwayAPI.Services
                 await AuthenticateSmtpClient(client);
                 var message = CreateEmailMessage(emailInput);
 
-                _logger.LogInformation("Sending email to {ToEmail}", emailInput.ToEmail);
+                _logger.LogInformation("Sending email to {ToEmail}", emailInput.ToEmails);
                 await client.SendAsync(message);
                 _logger.LogInformation("Email sent successfully.");
             }
@@ -58,12 +58,12 @@ namespace AirwayAPI.Services
             return (smtpServer, smtpPort, enableSsl);
         }
 
-        private void OverrideRecipientForDevelopment(EmailInputDto emailInput)
+        private void OverrideRecipientForDevelopment(EmailInputBase emailInput)
         {
             if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
             {
                 string currentUserEmail = GetCurrentUserEmail();
-                emailInput.ToEmail = currentUserEmail;
+                emailInput.ToEmails.Add(currentUserEmail);
                 emailInput.CCEmails = [];
                 _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
             }
@@ -84,16 +84,18 @@ namespace AirwayAPI.Services
             await client.AuthenticateAsync(smtpUser, smtpPass);
         }
 
-        private MimeMessage CreateEmailMessage(EmailInputDto emailInput)
+        private static MimeMessage CreateEmailMessage(EmailInputBase emailInput)
         {
             var message = new MimeMessage
             {
                 From = { new MailboxAddress("Airway", emailInput.FromEmail) },
-                To = { MailboxAddress.Parse(emailInput.ToEmail) },
                 Subject = emailInput.Subject
             };
 
-            if (emailInput.CCEmails != null && emailInput.CCEmails.Any())
+            // Add all recipients at once using LINQ
+            message.To.AddRange(emailInput.ToEmails.Select(email => MailboxAddress.Parse(email)));
+
+            if (emailInput.CCEmails != null && emailInput.CCEmails.Count != 0)
             {
                 foreach (var ccEmail in emailInput.CCEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
                 {
@@ -110,7 +112,7 @@ namespace AirwayAPI.Services
 
             var bodyBuilder = new BodyBuilder
             {
-                HtmlBody = ApplyEmailStyling(emailInput.HtmlBody)
+                HtmlBody = ApplyEmailStyling(emailInput.Body)
             };
 
             if (emailInput.Attachments != null)
