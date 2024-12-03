@@ -1,10 +1,9 @@
-﻿using AirwayAPI.Models.DTOs;
-using System.Threading.Tasks;
+﻿using AirwayAPI.Models.EmailModels;
 
 namespace AirwayAPI.Services
 {
     public interface IEmailService
     {
-        Task SendEmailAsync(EmailInputDto emailInput);
+        Task SendEmailAsync(EmailInputBase emailInput);
     }
 }
