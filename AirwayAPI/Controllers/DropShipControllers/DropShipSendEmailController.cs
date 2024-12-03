@@ -21,8 +21,8 @@ namespace AirwayAPI.Controllers.DropShipControllers
         [HttpPost]
         public async Task<ActionResult> DropShipSendEmailAsync([FromBody] DropShipEmailInput input)
         {
-            if (input == null || string.IsNullOrWhiteSpace(input.SenderUserName) || string.IsNullOrWhiteSpace(input.Password) ||
-                input.RecipientEmails == null || input.RecipientNames == null)
+            if (input == null || string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrWhiteSpace(input.Password) ||
+                input.ToEmails == null || input.RecipientNames == null)
             {
                 return BadRequest("Invalid input.");
             }
@@ -32,17 +32,17 @@ namespace AirwayAPI.Controllers.DropShipControllers
                 using (var client = new SmtpClient())
                 {
                     await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                    if (input.UserName.Trim().ToLower() == "lvonderporten")
                     {
                         await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.DecryptPassword(input.Password));
                     }
                     else
                     {
-                        await client.AuthenticateAsync(input.SenderUserName.Trim().ToLower() + "@airway.com", LoginUtils.DecryptPassword(input.Password));
+                        await client.AuthenticateAsync(input.UserName.Trim().ToLower() + "@airway.com", LoginUtils.DecryptPassword(input.Password));
                     }
 
                     User? senderInfo;
-                    if (input.SenderUserName.Trim().ToLower() == "lvonder")
+                    if (input.UserName.Trim().ToLower() == "lvonder")
                     {
                         senderInfo = await _context.Users
                             .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
@@ -51,7 +51,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     else
                     {
                         senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.SenderUserName.Trim().ToLower())
+                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.UserName.Trim().ToLower())
                             .FirstOrDefaultAsync();
                     }
 
@@ -61,7 +61,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     }
 
                     string senderFullname = senderInfo.Fname + " " + senderInfo.Lname;
-                    if (input.SenderUserName.Trim().ToLower() == "lvonderporten")
+                    if (input.UserName.Trim().ToLower() == "lvonderporten")
                     {
                         senderFullname = "Linda Von der Porten";
                     }
@@ -69,7 +69,7 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     var message = new MimeMessage();
 
                     // Sender profile
-                    message.From.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                    message.From.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
 
                     // Check if running on localhost:5001
                     bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost" && HttpContext.Request.Host.Port == 5001;
@@ -77,16 +77,16 @@ namespace AirwayAPI.Controllers.DropShipControllers
                     if (isLocalhost)
                     {
                         // Only send to current user
-                        message.To.Add(new MailboxAddress(senderFullname, input.SenderUserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.SenderUserName.Trim().ToLower() + "@airway.com"));
+                        message.To.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
                     }
                     else
                     {
                         // Add all recipients
-                        for (int i = 0; i < input.RecipientEmails.Length; ++i)
+                        for (int i = 0; i < input.ToEmails.Count; ++i)
                         {
-                            if (!string.IsNullOrWhiteSpace(input.RecipientEmails[i]) && !string.IsNullOrWhiteSpace(input.RecipientNames[i]))
+                            if (!string.IsNullOrWhiteSpace(input.ToEmails[i]) && !string.IsNullOrWhiteSpace(input.RecipientNames[i]))
                             {
-                                message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.RecipientEmails[i].Trim()));
+                                message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.ToEmails[i].Trim()));
                             }
                         }
                         message.To.Add(new MailboxAddress("AirWay Accounts Payable", "airwayap@airway.com"));
