@@ -23,10 +23,7 @@ namespace AirwayAPI.Services
         public async Task ProcessEquipmentRequest(QtSalesOrderDetail detail, SalesOrderUpdateDto request)
         {
             var equipmentRequest = await _context.EquipmentRequests
-                .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId);
-
-            if (equipmentRequest == null)
-                throw new Exception($"EquipmentRequest with RequestID {detail.RequestId} not found.");
+                .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId) ?? throw new Exception($"EquipmentRequest with RequestID {detail.RequestId} not found.");
 
             // Update SalesOrderNum
             if (!string.IsNullOrWhiteSpace(equipmentRequest.SalesOrderNum))
