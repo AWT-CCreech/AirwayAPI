@@ -1,4 +1,6 @@
 ﻿using AirwayAPI.Data;
+using AirwayAPI.Models.DTOs;
+using AirwayAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,13 +10,28 @@ namespace AirwayAPI.Controllers.ReportControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderWorkbenchController(eHelpDeskContext context, ILogger<SalesOrderWorkbenchController> logger) : ControllerBase
+    public class SalesOrderWorkbenchController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<SalesOrderWorkbenchController> _logger = logger;
+        private readonly eHelpDeskContext _context;
+        private readonly ILogger<SalesOrderWorkbenchController> _logger;
+        private readonly ISalesOrderService _salesOrderService;
 
+        public SalesOrderWorkbenchController(
+            eHelpDeskContext context,
+            ILogger<SalesOrderWorkbenchController> logger,
+            ISalesOrderService salesOrderService)
+        {
+            _context = context;
+            _logger = logger;
+            _salesOrderService = salesOrderService;
+        }
+
+        // GET: api/SalesOrderWorkbench/EventLevelData
         [HttpGet("EventLevelData")]
-        public async Task<IActionResult> GetEventLevelData([FromQuery] int? salesRepId, [FromQuery] string? billToCompany, [FromQuery] int? eventId)
+        public async Task<IActionResult> GetEventLevelData(
+            [FromQuery] int? salesRepId,
+            [FromQuery] string? billToCompany,
+            [FromQuery] int? eventId)
         {
             try
             {
@@ -31,7 +48,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                                 so.BillToCompanyName,
                                 so.SaleTotal,
                                 so.SaleDate,
-                                so.AccountMgr, // for filtering
+                                so.AccountMgr,
                                 SalesRep = u != null ? u.Uname : "N/A"
                             };
 
@@ -61,8 +78,12 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
         }
 
+        // GET: api/SalesOrderWorkbench/DetailLevelData
         [HttpGet("DetailLevelData")]
-        public async Task<IActionResult> GetDetailLevelData([FromQuery] int? salesRepId, [FromQuery] string? billToCompany, [FromQuery] int? eventId)
+        public async Task<IActionResult> GetDetailLevelData(
+            [FromQuery] int? salesRepId,
+            [FromQuery] string? billToCompany,
+            [FromQuery] int? eventId)
         {
             try
             {
@@ -84,7 +105,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                                 so.RwsalesOrderNum,
                                 so.EventId,
                                 so.BillToCompanyName,
-                                so.AccountMgr, // for filtering
+                                so.AccountMgr,
                                 SalesRep = u != null ? u.Uname : "N/A"
                             };
 
@@ -111,6 +132,22 @@ namespace AirwayAPI.Controllers.ReportControllers
             {
                 _logger.LogError("Error in GetDetailLevelData: {ex.Message}", ex);
                 return StatusCode(500, "Error fetching Detail Level Data");
+            }
+        }
+
+        // POST: api/SalesOrderWorkbench/UpdateSalesOrder
+        [HttpPost("UpdateSalesOrder")]
+        public async Task<IActionResult> UpdateSalesOrder([FromBody] SalesOrderUpdateDto request)
+        {
+            try
+            {
+                await _salesOrderService.UpdateSalesOrderAsync(request);
+                return Ok("Sales Order updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error updating sales order: {ex.Message}", ex);
+                return StatusCode(500, "Error updating sales order.");
             }
         }
     }

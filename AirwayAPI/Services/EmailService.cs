@@ -1,101 +1,116 @@
-﻿using AirwayAPI.Models.EmailModels;
+﻿using AirwayAPI.Application;
+using AirwayAPI.Assets;
+using AirwayAPI.Models.EmailModels;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
-using System.Security.Claims;
+using MimeKit.Utils;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService(
-        ILogger<EmailService> logger,
-        IConfiguration configuration,
-        IHttpContextAccessor httpContextAccessor) : IEmailService
+    public class EmailService : IEmailService
     {
-        private readonly ILogger<EmailService> _logger = logger;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+        private readonly ILogger<EmailService> _logger;
+        private readonly IConfiguration _configuration;
+
+        public EmailService(ILogger<EmailService> logger, IConfiguration configuration)
+        {
+            _logger = logger;
+            _configuration = configuration;
+        }
 
         public async Task SendEmailAsync(EmailInputBase emailInput)
         {
             _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmails);
 
-            var (smtpServer, smtpPort, enableSsl) = GetSmtpConfiguration();
+            var (server, port, useSsl) = GetSmtpConfiguration();
 
+            // Override recipients in development environment
             OverrideRecipientForDevelopment(emailInput);
 
-            emailInput.FromEmail ??= GetCurrentUserEmail();
+            var message = CreateEmailMessage(emailInput);
 
             using var client = new SmtpClient();
-            ConfigureSmtpClient(client, enableSsl);
 
             try
             {
-                await AuthenticateSmtpClient(client);
-                var message = CreateEmailMessage(emailInput);
+                // Connect to SMTP server
+                _logger.LogInformation("Connecting to SMTP server: {Server}:{Port}", server, port);
+                await client.ConnectAsync(server, port, useSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
 
-                _logger.LogInformation("Sending email to {ToEmail}", emailInput.ToEmails);
+                // Authenticate with SMTP server
+                if (string.IsNullOrWhiteSpace(emailInput.UserName) || string.IsNullOrWhiteSpace(emailInput.Password))
+                {
+                    throw new ArgumentNullException("Username and Password must be provided.");
+                }
+
+                _logger.LogInformation("Authenticating SMTP client as {UserName}", emailInput.UserName);
+                await client.AuthenticateAsync($"{emailInput.UserName}@airway.com", LoginUtils.DecryptPassword(emailInput.Password));
+
+                // Send the email
+                _logger.LogInformation("Sending email to {ToEmail}", string.Join(", ", emailInput.ToEmails));
                 await client.SendAsync(message);
+
                 _logger.LogInformation("Email sent successfully.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while sending email.");
+                _logger.LogError("Error occurred while sending email: {Message}", ex.Message);
                 throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
             }
             finally
             {
-                await DisconnectSmtpClient(client);
+                if (client.IsConnected)
+                {
+                    await client.DisconnectAsync(true);
+                    _logger.LogInformation("Disconnected from SMTP server.");
+                }
             }
-        }
-
-        private (string smtpServer, int smtpPort, bool enableSsl) GetSmtpConfiguration()
-        {
-            var emailSettings = _configuration.GetSection("EmailSettings");
-            string smtpServer = emailSettings.GetValue<string>("SmtpServer") ?? throw new InvalidOperationException("SMTP Server is not configured.");
-            int smtpPort = emailSettings.GetValue<int>("SmtpPort");
-            bool enableSsl = emailSettings.GetValue<bool>("EnableSsl");
-
-            return (smtpServer, smtpPort, enableSsl);
         }
 
         private void OverrideRecipientForDevelopment(EmailInputBase emailInput)
         {
             if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
             {
-                string currentUserEmail = GetCurrentUserEmail();
-                emailInput.ToEmails.Add(currentUserEmail);
-                emailInput.CCEmails = [];
-                _logger.LogInformation("In development mode: overriding recipient email to current user: {CurrentUserEmail}", currentUserEmail);
+                var currentUserEmail = GetCurrentUserEmail();
+                _logger.LogWarning("Development mode: Overriding all recipients to {CurrentUserEmail}", currentUserEmail);
+
+                // Replace recipients with the current user's email
+                emailInput.ToEmails = new List<string> { currentUserEmail };
+                emailInput.CCEmails = new List<string>();
             }
         }
 
-        private static void ConfigureSmtpClient(SmtpClient client, bool enableSsl)
+        private string GetCurrentUserEmail()
         {
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            return _configuration.GetValue<string>("DevEmail") ?? "ccreech@airway.com";
         }
 
-        private async Task AuthenticateSmtpClient(SmtpClient client)
+        private (string Server, int Port, bool UseSsl) GetSmtpConfiguration()
         {
-            string smtpUser = _configuration.GetValue<string>("EmailSettings:SmtpUser") ?? throw new InvalidOperationException("SMTP User is not configured.");
-            string smtpPass = _configuration.GetValue<string>("EmailSettings:SmtpPass") ?? throw new InvalidOperationException("SMTP Password is not configured.");
-
-            _logger.LogInformation("Authenticating with SMTP server as {UserEmail}", smtpUser);
-            await client.ConnectAsync(GetSmtpConfiguration().smtpServer, GetSmtpConfiguration().smtpPort, GetSmtpConfiguration().enableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
-            await client.AuthenticateAsync(smtpUser, smtpPass);
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            return (
+                Server: emailSettings["SmtpServer"] ?? throw new InvalidOperationException("SMTP Server is not configured."),
+                Port: emailSettings.GetValue<int>("SmtpPort"),
+                UseSsl: emailSettings.GetValue<bool>("EnableSsl")
+            );
         }
 
         private static MimeMessage CreateEmailMessage(EmailInputBase emailInput)
         {
             var message = new MimeMessage
             {
-                From = { new MailboxAddress("Airway", emailInput.FromEmail) },
                 Subject = emailInput.Subject
             };
 
-            // Add all recipients at once using LINQ
-            message.To.AddRange(emailInput.ToEmails.Select(email => MailboxAddress.Parse(email)));
+            message.From.Add(new MailboxAddress("Airway", emailInput.FromEmail));
 
-            if (emailInput.CCEmails != null && emailInput.CCEmails.Count != 0)
+            foreach (var toEmail in emailInput.ToEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
+            {
+                message.To.Add(MailboxAddress.Parse(toEmail));
+            }
+
+            if (emailInput.CCEmails != null)
             {
                 foreach (var ccEmail in emailInput.CCEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
                 {
@@ -103,37 +118,52 @@ namespace AirwayAPI.Services
                 }
             }
 
-            if (emailInput.Urgent)
+            var bodyBuilder = new BodyBuilder();
+            string emailContent = Email.EmailTemplate;
+
+            // Replace placeholders
+            if (emailInput.Placeholders != null)
             {
-                message.Headers.Add("X-Priority", "1");
-                message.Headers.Add("X-MSMail-Priority", "High");
-                message.Headers.Add("Importance", "High");
+                emailContent = ReplacePlaceholders(emailContent, emailInput.Placeholders);
             }
 
-            var bodyBuilder = new BodyBuilder
-            {
-                HtmlBody = ApplyEmailStyling(emailInput.Body)
-            };
-
+            // Add attachments
             if (emailInput.Attachments != null)
             {
-                foreach (var attachmentPath in emailInput.Attachments.Where(path => !string.IsNullOrWhiteSpace(path)))
+                foreach (var attachmentPath in emailInput.Attachments.Where(File.Exists))
                 {
                     bodyBuilder.Attachments.Add(attachmentPath);
                 }
             }
 
+            // Add linked images
+            string[] logos = ["image1.png", "image2.png", "image3.png", "image4.png", "image5.png"];
+            var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Files", "Logos");
+
+            for (int i = 0; i < logos.Length; ++i)
+            {
+                var fullPathToLogo = Path.Combine(logoPath, logos[i]);
+                if (File.Exists(fullPathToLogo))
+                {
+                    var image = bodyBuilder.LinkedResources.Add(fullPathToLogo);
+                    image.ContentId = MimeUtils.GenerateMessageId();
+                    emailContent = emailContent.Replace($"%%IMAGE{i + 1}%%", $"cid:{image.ContentId}");
+                }
+            }
+
+            bodyBuilder.HtmlBody = ApplyEmailStyling(emailContent);
             message.Body = bodyBuilder.ToMessageBody();
+
             return message;
         }
 
-        private async Task DisconnectSmtpClient(SmtpClient client)
+        private static string ReplacePlaceholders(string emailBody, IDictionary<string, string> placeholders)
         {
-            if (client.IsConnected)
+            foreach (var placeholder in placeholders)
             {
-                await client.DisconnectAsync(true);
-                _logger.LogInformation("SMTP connection closed.");
+                emailBody = emailBody.Replace(placeholder.Key, placeholder.Value);
             }
+            return emailBody;
         }
 
         private static string ApplyEmailStyling(string bodyContent)
@@ -142,73 +172,14 @@ namespace AirwayAPI.Services
                 <html>
                 <head>
                     <style>
-                        .card {{
-                            max-width: 600px;
-                            margin: auto;
-                            padding: 20px;
-                            border: 1px solid #e0e0e0;
-                            border-radius: 8px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                            font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-                            color: #333;
-                        }}
-                        .card h2 {{
-                            font-size: 24px;
-                            font-weight: 400;
-                            margin-bottom: 20px;
-                            text-align: center;
-                            color: #3f51b5;
-                        }}
-                        .card p {{
-                            font-size: 16px;
-                            line-height: 1.5;
-                        }}
-                        .card table {{
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-top: 20px;
-                        }}
-                        .card th, .card td {{
-                            text-align: left;
-                            padding: 8px;
-                        }}
-                        .card th {{
-                            background-color: #f5f5f5;
-                            border-bottom: 1px solid #ddd;
-                        }}
-                        .card tr:nth-child(even) {{
-                            background-color: #fafafa;
-                        }}
-                        .card a {{
-                            color: #3f51b5;
-                            text-decoration: none;
-                        }}
-                        .card a:hover {{
-                            text-decoration: underline;
-                        }}
+                        body {{ font-family: Arial, sans-serif; line-height: 1.5; }}
+                        .email-body {{ padding: 20px; }}
                     </style>
                 </head>
-                <body>
-                    <div class='card'>
-                        {bodyContent}
-                    </div>
+                <body class='email-body'>
+                    {bodyContent}
                 </body>
                 </html>";
-        }
-
-        private string GetCurrentUserEmail()
-        {
-            var emailClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Email);
-            if (emailClaim != null && !string.IsNullOrEmpty(emailClaim.Value))
-            {
-                _logger.LogInformation("Current user email: {Email}", emailClaim.Value);
-                return emailClaim.Value;
-            }
-            else
-            {
-                _logger.LogError("Current user's email not found in claims.");
-                throw new InvalidOperationException("User's email claim is missing.");
-            }
         }
     }
 }

@@ -10,6 +10,8 @@
         public string Body { get; set; }             // Email body
         public List<string> CCEmails { get; set; } = new List<string>();  // List of CC emails
         public List<string> Attachments { get; set; } = new List<string>(); // List of attachment file paths
+        public List<string> InlineImages { get; set; } = new List<string>(); // List of inline image file paths
+        public IDictionary<string, string>? Placeholders { get; set; } // List of placeholders tp be handled by EmailService
         public bool Urgent { get; set; }
     }
 

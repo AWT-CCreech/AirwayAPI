@@ -1,51 +1,42 @@
-﻿using AirwayAPI.Application;
-using AirwayAPI.Assets;
-using AirwayAPI.Data;
-using AirwayAPI.Models;
+﻿using AirwayAPI.Data;
+using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.MassMailerModels;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using Microsoft.AspNetCore.Authorization;
+using AirwayAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using MimeKit;
-using MimeKit.Utils;
 using System.Data;
 
 namespace AirwayAPI.Controllers.MassMailerControllers
 {
-    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class MassMailerEmailOutsController(eHelpDeskContext context, ILogger<MassMailerEmailOutsController> logger) : ControllerBase
+    public class MassMailerEmailOutsController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<MassMailerEmailOutsController> _logger = logger;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<MassMailerEmailOutsController> _logger;
+        private readonly eHelpDeskContext _context;
+
+        public MassMailerEmailOutsController(
+            IEmailService emailService,
+            ILogger<MassMailerEmailOutsController> logger,
+            eHelpDeskContext context)
+        {
+            _emailService = emailService;
+            _logger = logger;
+            _context = context;
+        }
 
         [HttpPost]
-        public async Task<ActionResult> SendEmailAsync([FromBody] MassMailerEmailInput input)
+        public async Task<IActionResult> SendEmail([FromBody] MassMailerEmailInput input)
         {
             try
             {
-                SmtpClient client = new();
-                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-
-                if (string.IsNullOrWhiteSpace(input?.UserName) || string.IsNullOrWhiteSpace(input?.Password))
-                {
-                    throw new ArgumentNullException($"{input?.UserName} and {input?.Password} cannot be null");
-                }
-
-                string UserName = input.UserName.Trim().ToLower();
-                string email = UserName == "lvonderporten" ? "lvonder@airway.com" : UserName + "@airway.com";
-
-                await client.AuthenticateAsync(email, LoginUtils.DecryptPassword(input.Password));
-
-                User? senderInfo;
+                // Normalize and fetch sender info
                 var normalizedUserName = input.UserName.Trim().ToLower();
-
-                senderInfo = await _context.Users
-                    .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == (normalizedUserName == "lvonder" ? "lvonderporten" : normalizedUserName))
+                var senderInfo = await _context.Users
+                    .Where(user => user.Uname != null && user.Uname.Trim().ToLower() ==
+                        (normalizedUserName == "lvonder" ? "lvonderporten" : normalizedUserName))
                     .FirstOrDefaultAsync();
 
                 if (senderInfo == null)
@@ -53,196 +44,79 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                     return NotFound("Sender information not found.");
                 }
 
-                string senderFullname = (senderInfo.Fname ?? string.Empty) + " " + (senderInfo.Lname ?? string.Empty);
+                // Construct sender details
+                string senderFullName = (senderInfo.Fname ?? string.Empty) + " " + (senderInfo.Lname ?? string.Empty);
                 if (normalizedUserName == "lvonderporten")
                 {
-                    senderFullname = "Linda Von der Porten";
+                    senderFullName = "Linda Von der Porten";
                 }
 
-                MimeMessage message = new();
-
-                message.From.Add(new MailboxAddress(senderFullname, email));
-
-                if (input.CCEmails?.Count != input.CCNames?.Count)
-                {
-                    throw new ArgumentException("CCEmails and CCNames must have the same length");
-                }
-
-                if (input.CCEmails != null && input.CCNames != null)
-                {
-                    for (int j = 0; j < input.CCEmails.Count; ++j)
-                    {
-                        if (!string.IsNullOrWhiteSpace(input.CCEmails[j]) && !string.IsNullOrWhiteSpace(input.CCNames[j]))
-                        {
-                            message.Cc.Add(new MailboxAddress(input.CCNames[j].Trim(), input.CCEmails[j].Trim()));
-                        }
-                    }
-                }
-
-                message.Subject = input.Subject;
-                BodyBuilder bodyBuilder = new();
-                string emailContent = Email.EmailTemplate;
-
-                emailContent = emailContent.Replace("%%EMAILBODY%%", input.Body)
-                                            .Replace("%%NAME%%", senderFullname)
-                                            .Replace("%%JOBTITLE%%", senderInfo.JobTitle)
-                                            .Replace("%%DIRECT%%", senderInfo.DirectPhone)
-                                            .Replace("%%MOBILE%%", senderInfo.MobilePhone);
-
-                var folderName = Path.Combine("Files", "MassMailerAttachment", normalizedUserName);
-
-                List<string> array = input.Attachments ?? [];
-                for (int i = 0; i < array.Count; i++)
-                {
-                    string fileName = array[i];
-                    if (!string.IsNullOrWhiteSpace(fileName))
-                    {
-                        var fullPath = Path.Combine(Directory.GetCurrentDirectory(), folderName, fileName);
-                        bodyBuilder.Attachments.Add(fullPath);
-                    }
-                }
-
-                string[] logos = ["image1.png", "image2.png", "image3.png", "image4.png", "image5.png"];
-                var logoPath = Path.Combine(Directory.GetCurrentDirectory(), "Files", "Logos");
-
-                for (int i = 0; i < logos.Length; ++i)
-                {
-                    var fullPathToLogo = Path.Combine(logoPath, logos[i]);
-                    var image = bodyBuilder.LinkedResources.Add(fullPathToLogo);
-                    image.ContentId = MimeUtils.GenerateMessageId();
-                    emailContent = emailContent.Replace($"%%IMAGE{i + 1}%%", image.ContentId);
-                }
-
+                // Log email to database
                 var commandText = "EXEC usp_ins_MassMailers @MassMailDesc, @DateSent, @UserID, @Id OUT";
                 var sanitizedSubject = input.Subject.Replace("'", "''");
                 var desc = new SqlParameter("@MassMailDesc", sanitizedSubject);
                 var date = new SqlParameter("@DateSent", DateTime.Now);
                 var userId = new SqlParameter("@UserID", senderInfo.Id);
-                var massMailId = new SqlParameter { ParameterName = "@Id", SqlDbType = SqlDbType.Int, Direction = ParameterDirection.Output };
+                var massMailId = new SqlParameter
+                {
+                    ParameterName = "@Id",
+                    SqlDbType = SqlDbType.Int,
+                    Direction = ParameterDirection.Output
+                };
 
                 _context.Database.ExecuteSqlRaw(commandText, new[] { desc, date, userId, massMailId });
 
-                for (int i = 0; i < input.ToEmails.Count; ++i)
+                // Generate part table content
+                var partTable = "<table><thead><tr><th>Airway Part Number</th><th>Mfg Part Number</th><th>Part Description</th><th>Qty</th><th>Manufacturer</th><th>Rev</th></tr></thead><tbody>";
+                foreach (var item in input.Items)
                 {
-                    if (string.IsNullOrWhiteSpace(input.ToEmails[i]) || string.IsNullOrWhiteSpace(input.RecipientCompanies[i]) || string.IsNullOrWhiteSpace(input.RecipientNames[i]))
-                    {
-                        throw new ArgumentNullException("Recipient fields cannot contain null or whitespace values");
-                    }
-
-                    var items = new List<MassMailerPartItem>();
-
-                    for (var j = 0; j < input.Items.Count; ++j)
-                    {
-                        var item = input.Items[j];
-                        if (item == null) continue;
-
-                        var check = await (from c in _context.SellOpCompetitors
-                                           join r in _context.EquipmentRequests on c.EventId equals r.EventId
-                                           join e in _context.RequestEvents on r.EventId equals e.EventId
-                                           join cc in _context.CamContacts on e.ContactId equals cc.Id
-                                           where r.RequestId == item.Id &&
-                                                 (c.Company != null && c.Company.Trim().ToLower() == input.RecipientCompanies[i].Trim().ToLower())
-                                           select c.Id).ToListAsync();
-
-                        if (check.Count == 0)
-                        {
-                            items.Add(item);
-
-                            _context.CompetitorCalls.Add(new CompetitorCall
-                            {
-                                PartNum = item.PartNum?.Replace("'", "''") ?? string.Empty,
-                                MfgPartNum = item.AltPartNum?.Replace("'", "''") ?? string.Empty,
-                                CompanyName = input.RecipientCompanies[i].Replace("'", "''"),
-                                ContactName = input.RecipientNames[i].Replace("'", "''"),
-                                MassMailing = true,
-                                EnteredBy = senderInfo.Id,
-                                ModifiedBy = senderInfo.Id
-                            });
-
-                            _context.MassMailHistories.Add(new MassMailHistory
-                            {
-                                MassMailId = (int)massMailId.Value,
-                                CompanyName = input.RecipientCompanies[i].Replace("'", "''"),
-                                ContactName = input.RecipientNames[i].Replace("'", "''"),
-                                RequestId = item.Id,
-                                PartNum = item.PartNum?.Replace("'", "''") ?? string.Empty,
-                                AltPartNum = item.AltPartNum?.Replace("'", "''") ?? string.Empty,
-                                PartDesc = item.PartDesc?.Replace("'", "''") ?? string.Empty,
-                                Qty = (int?)(item.Qty ?? 0),
-                                DateSent = DateTime.Now
-                            });
-
-                            int callCnt = await _context.CompetitorCalls.Where(c => c.RequestId == item.Id && c.CallType == "Purchasing").CountAsync();
-                            if (callCnt < 1)
-                            {
-                                var er = await _context.EquipmentRequests.FirstOrDefaultAsync(e => e.RequestId == item.Id);
-                                if (er != null)
-                                {
-                                    er.ProcureRep = senderInfo.Id;
-                                }
-                                else
-                                {
-                                    return NotFound("EquipmentRequest not found.");
-                                }
-                            }
-
-                            await _context.SaveChangesAsync();
-                        }
-
-                        _context.CamActivities.Add(new CamActivity
-                        {
-                            ContactId = input.RecipientIds[i],
-                            ActivityOwner = input.UserName,
-                            ActivityType = "CallOut",
-                            Notes = "<b>Mass Mail Sent For:</b> " + input.Subject.Replace("'", "''"),
-                            ActivityDate = DateTime.Now
-                        });
-                        await _context.SaveChangesAsync();
-                    }
-
-                    if (items.Count > 0)
-                    {
-                        var nameParts = input.RecipientNames[i].Split(' ');
-                        var firstName = nameParts[0];
-                        var lastName = nameParts.Length >= 2 ? nameParts[^1] : string.Empty;
-
-                        bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost";
-
-                        if (isLocalhost)
-                        {
-                            message.To.Add(new MailboxAddress(senderFullname, email));
-                        }
-                        else
-                        {
-                            message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.ToEmails[i].Trim()));
-                        }
-
-                        var partTable = "";
-                        items.ForEach(item =>
-                        {
-                            partTable += $"<tr><td>{item.PartNum}</td><td>{item.AltPartNum}</td><td>{item.PartDesc}</td><td>{item.Qty}</td><td>{item.Manufacturer}</td><td>{item.Revision}</td></tr>";
-                        });
-
-                        bodyBuilder.HtmlBody = emailContent.Replace("%%PARTTABLE%%", partTable)
-                                                            .Replace("%fullname%", input.RecipientNames[i])
-                                                            .Replace("%firstname%", firstName)
-                                                            .Replace("%lastname%", lastName);
-                        message.Body = bodyBuilder.ToMessageBody();
-
-                        await client.SendAsync(message);
-                    }
+                    partTable += $"<tr><td>{item.PartNum}</td><td>{item.AltPartNum}</td><td>{item.PartDesc}</td><td>{item.Qty}</td><td>{item.Manufacturer}</td><td>{item.Revision}</td></tr>";
                 }
+                partTable += "</tbody></table>";
 
-                await client.DisconnectAsync(true);
-                client.Dispose();
+                // Generate placeholders
+                var placeholders = new Dictionary<string, string>
+                {
+                    { "%%EMAILBODY%%", input.Body },
+                    { "%%NAME%%", senderFullName },
+                    { "%%JOBTITLE%%", senderInfo.JobTitle ?? string.Empty },
+                    { "%%DIRECT%%", senderInfo.DirectPhone ?? string.Empty },
+                    { "%%MOBILE%%", senderInfo.MobilePhone ?? string.Empty },
+                    { "%%PARTTABLE%%", partTable }
+                };
 
-                return Ok();
+                // Prepare attachment paths
+                var folderName = Path.Combine("Files", "MassMailerAttachment", normalizedUserName);
+                var attachmentPaths = input.Attachments?.Select(fileName =>
+                    Path.Combine(Directory.GetCurrentDirectory(), folderName, fileName)).ToList();
+
+                var emailInput = new EmailInputBase
+                {
+                    FromEmail = $"{input.UserName}@airway.com",
+                    ToEmails = input.ToEmails,
+                    CCEmails = input.CCEmails,
+                    Subject = input.Subject,
+                    Body = input.Body,
+                    Attachments = attachmentPaths,
+                    InlineImages = new List<string>(), // Pass additional inline images if required
+                    UserName = input.UserName,
+                    Password = input.Password,
+                    Placeholders = placeholders
+                };
+
+                await _emailService.SendEmailAsync(emailInput);
+
+                // Log the mass mail ID
+                _logger.LogInformation("MassMailer entry created with ID: {MassMailId}", massMailId.Value);
+
+                return Ok("Email sent successfully.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while sending email.");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message, stackTrace = ex.StackTrace });
+                _logger.LogError("Error sending email: {Message}", ex.Message);
+                return StatusCode(500, new { error = ex.Message });
             }
         }
+
     }
 }

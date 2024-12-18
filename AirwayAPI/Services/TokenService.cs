@@ -28,6 +28,7 @@ namespace AirwayAPI.Services
             {
                 new(JwtRegisteredClaimNames.Sub, username), // 'sub' claim
                 new(ClaimTypes.NameIdentifier, username),
+                new(ClaimTypes.Email, $"{username}@airway.com"),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
