@@ -1,23 +1,14 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Services
 {
-    public class QuoteService : IQuoteService
+    public class QuoteService(eHelpDeskContext context, ILogger<QuoteService> logger) : IQuoteService
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<QuoteService> _logger;
-
-        public QuoteService(eHelpDeskContext context, ILogger<QuoteService> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<QuoteService> _logger = logger;
 
         /// <summary>
         /// Updates the related quote in the qtQuote table with sales order and drop shipment details.

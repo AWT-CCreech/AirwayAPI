@@ -1,5 +1,5 @@
 ﻿using AirwayAPI.Models.SecurityModels;
-using AirwayAPI.Services;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;

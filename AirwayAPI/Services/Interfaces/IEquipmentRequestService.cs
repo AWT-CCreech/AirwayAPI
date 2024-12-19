@@ -2,7 +2,7 @@
 using AirwayAPI.Models;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services.Interfaces
 {
     public interface IEquipmentRequestService
     {

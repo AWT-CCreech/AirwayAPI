@@ -3,7 +3,7 @@ using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.PODeliveryLogModels;
-using AirwayAPI.Services;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

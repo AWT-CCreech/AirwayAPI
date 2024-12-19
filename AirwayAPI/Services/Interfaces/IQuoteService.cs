@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Models.DTOs;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services.Interfaces
 {
     public interface IQuoteService
     {

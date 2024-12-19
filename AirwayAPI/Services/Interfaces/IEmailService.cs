@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Models.EmailModels;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services.Interfaces
 {
     public interface IEmailService
     {

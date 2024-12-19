@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services.Interfaces
 {
     public interface ITokenService
     {

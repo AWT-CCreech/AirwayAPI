@@ -1,7 +1,7 @@
 ﻿using AirwayAPI.Models.DTOs;
 using System.Threading.Tasks;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services.Interfaces
 {
     public interface ISalesOrderService
     {

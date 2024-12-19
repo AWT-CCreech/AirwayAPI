@@ -1,20 +1,15 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Services
 {
-    public class EquipmentRequestService : IEquipmentRequestService
+    public class EquipmentRequestService(eHelpDeskContext context, ILogger<EquipmentRequestService> logger) : IEquipmentRequestService
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<EquipmentRequestService> _logger;
-
-        public EquipmentRequestService(eHelpDeskContext context, ILogger<EquipmentRequestService> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<EquipmentRequestService> _logger = logger;
 
         public async Task ProcessEquipmentRequest(QtSalesOrderDetail detail, SalesOrderUpdateDto request)
         {
@@ -22,7 +17,7 @@ namespace AirwayAPI.Services
                 .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId)
                 ?? throw new Exception($"EquipmentRequest with RequestID {detail.RequestId} not found.");
 
-            equipmentRequest.SalesOrderNum = UpdateSalesOrderNum(equipmentRequest.SalesOrderNum, request.RWSalesOrderNum);
+            equipmentRequest.SalesOrderNum = UpdateSalesOrderNum(equipmentRequest.SalesOrderNum ?? "", request.RWSalesOrderNum);
             equipmentRequest.Status = "Sold";
             equipmentRequest.SalePrice = detail.UnitPrice;
             equipmentRequest.MarkedSoldDate = DateTime.Now;
@@ -50,12 +45,7 @@ namespace AirwayAPI.Services
                 var salesOrderDetail = await _context.QtSalesOrderDetails
                     .FirstOrDefaultAsync(d => d.Id == id);
 
-                if (salesOrderDetail == null)
-                {
-                    throw new Exception($"Sales order detail with ID {id} not found.");
-                }
-
-                return salesOrderDetail;
+                return salesOrderDetail ?? throw new Exception($"Sales order detail with ID {id} not found.");
             }
             catch (Exception ex)
             {
@@ -64,11 +54,21 @@ namespace AirwayAPI.Services
             }
         }
 
-        private string UpdateSalesOrderNum(string existing, string newNum)
+        /// <summary>
+        /// Updates the SalesOrderNum with the value provided by the user from the frontend. 
+        /// Currently, this method directly replaces the existing value with the new input.
+        /// 
+        /// Potential for Future Enhancements:
+        /// - Maintain a history of changes to SalesOrderNum for auditing purposes.
+        /// - Add validation or formatting logic to ensure the input aligns with business rules.
+        /// - Implement hooks for logging updates to track user changes over time.
+        /// </summary>
+        /// <param name="existing">The current SalesOrderNum stored in the database.</param>
+        /// <param name="newNum">The new SalesOrderNum provided by the user.</param>
+        /// <returns>The updated SalesOrderNum, replacing the existing value entirely.</returns>
+        private static string UpdateSalesOrderNum(string existing, string newNum)
         {
-            if (string.IsNullOrWhiteSpace(existing)) return newNum;
-            if (!existing.Contains(newNum)) return $"{existing}, {newNum}";
-            return existing;
+            return newNum;
         }
 
         private async Task<bool> ShouldMarkAsBoughtAsync(EquipmentRequest request, int qtySold)

@@ -1,6 +1,7 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Assets;
 using AirwayAPI.Models.EmailModels;
+using AirwayAPI.Services.Interfaces;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -8,16 +9,10 @@ using MimeKit.Utils;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService : IEmailService
+    public class EmailService(ILogger<EmailService> logger, IConfiguration configuration) : IEmailService
     {
-        private readonly ILogger<EmailService> _logger;
-        private readonly IConfiguration _configuration;
-
-        public EmailService(ILogger<EmailService> logger, IConfiguration configuration)
-        {
-            _logger = logger;
-            _configuration = configuration;
-        }
+        private readonly ILogger<EmailService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
 
         public async Task SendEmailAsync(EmailInputBase emailInput)
         {
@@ -76,8 +71,8 @@ namespace AirwayAPI.Services
                 _logger.LogWarning("Development mode: Overriding all recipients to {CurrentUserEmail}", currentUserEmail);
 
                 // Replace recipients with the current user's email
-                emailInput.ToEmails = new List<string> { currentUserEmail };
-                emailInput.CCEmails = new List<string>();
+                emailInput.ToEmails = [currentUserEmail];
+                emailInput.CCEmails = [];
             }
         }
 

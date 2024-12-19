@@ -1,7 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.MassMailerModels;
-using AirwayAPI.Services;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
