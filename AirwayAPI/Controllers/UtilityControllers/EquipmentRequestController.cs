@@ -28,9 +28,9 @@ namespace AirwayAPI.Controllers.UtilityControllers
             try
             {
                 // Fetch the SalesOrderDetail by Id
-                var detail = await _equipmentRequestService.GetSalesOrderDetailByIdAsync(request.Id);
+                var detail = await _equipmentRequestService.GetSalesOrderDetailByIdAsync(request.RequestId);
                 if (detail == null)
-                    return NotFound($"QtSalesOrderDetail with Id {request.Id} not found.");
+                    return NotFound($"QtSalesOrderDetail with Id {request.RequestId} not found.");
 
                 // Create SalesOrderUpdateDto based on EquipmentRequestUpdateDto
                 var salesOrderUpdateDto = new SalesOrderUpdateDto
