@@ -51,7 +51,7 @@ namespace AirwayAPI.Services
                 }
 
                 // Notify Changes via Email
-                await NotifyChanges(request, salesOrder);
+                await NotifySalesOrdersChanges(request, salesOrder);
 
                 // Commit Transaction
                 await transaction.CommitAsync();
@@ -64,20 +64,92 @@ namespace AirwayAPI.Services
             }
         }
 
-        private async Task NotifyChanges(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
+        public async Task UpdateEquipmentRequestAsync(EquipmentRequestUpdateDto request)
         {
-            string subject = $"Sales Order {salesOrder.RwsalesOrderNum} Updated";
-            string body = $"The sales order {salesOrder.RwsalesOrderNum} has been updated.";
-
-            await _emailService.SendEmailAsync(new EmailInputBase
+            try
             {
-                FromEmail = $"{request.Username}@airway.com",
-                ToEmails = ["ccreech@airway.com"],
-                Subject = subject,
-                Body = body,
+                var detail = await _context.EquipmentRequests
+                    .FirstOrDefaultAsync(d => d.RequestId == request.RequestId)
+                    ?? throw new Exception($"Request ID#{request.RequestId} not found.");
+
+                //detail.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.RWSalesOrderNum);
+                detail.DropShipment = request.DropShipment;
+
+                await _context.SaveChangesAsync();
+
+                // Notify Changes via Email
+                await NotifyEquipmentRequestChanges(request, detail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in UpdateEquipmentRequestAsync: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        private async Task NotifyEquipmentRequestChanges(EquipmentRequestUpdateDto request, EquipmentRequest equipmentRequest)
+        {
+            // Retrieve sender information
+            var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
+
+            // Construct placeholders
+            var placeholders = new Dictionary<string, string>
+            {
+                { "%%EMAILBODY%%", $"SO#{equipmentRequest.SalesOrderNum} has been updated." },
+                { "%%NAME%%", senderInfo.FullName },
+                { "%%EMAIL%%", senderInfo.Email },
+                { "%%JOBTITLE%%", senderInfo.JobTitle },
+                { "%%DIRECT%%", senderInfo.DirectPhone },
+                { "%%MOBILE%%", senderInfo.MobilePhone }
+            };
+
+            // Construct email input
+            var emailInput = new EmailInputBase
+            {
+                FromEmail = senderInfo.Email,
+                ToEmails = new List<string> { "ccreech@airway.com" },
+                Subject = $"Sales Order {equipmentRequest.SalesOrderNum} Updated",
+                Body = "%%EMAILBODY%%", // Placeholder to be replaced dynamically
+                Placeholders = placeholders,
                 UserName = request.Username,
                 Password = request.Password
-            });
+            };
+
+            // Send email
+            await _emailService.SendEmailAsync(emailInput);
+        }
+
+
+        private async Task NotifySalesOrdersChanges(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
+        {
+            // Retrieve sender information
+            var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
+
+            // Construct placeholders
+            var placeholders = new Dictionary<string, string>
+            {
+                { "%%EMAILBODY%%", $"SO#{salesOrder.RwsalesOrderNum} has been updated." },
+                { "%%NAME%%", senderInfo.FullName },
+                { "%%EMAIL%%", senderInfo.Email },
+                { "%%JOBTITLE%%", senderInfo.JobTitle },
+                { "%%DIRECT%%", senderInfo.DirectPhone },
+                { "%%MOBILE%%", senderInfo.MobilePhone }
+            };
+
+            // Construct email input
+            var emailInput = new EmailInputBase
+            {
+                FromEmail = senderInfo.Email,
+                ToEmails = new List<string> { "ccreech@airway.com" },
+                Subject = $"Sales Order {salesOrder.RwsalesOrderNum} Updated",
+                Body = "%%EMAILBODY%%", // Placeholder to be replaced dynamically
+                Placeholders = placeholders,
+                UserName = request.Username,
+                Password = request.Password
+            };
+
+            // Send email
+            await _emailService.SendEmailAsync(emailInput);
         }
     }
 }
