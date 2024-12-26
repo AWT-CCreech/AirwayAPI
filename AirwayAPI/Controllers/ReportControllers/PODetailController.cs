@@ -1,6 +1,6 @@
-﻿using AirwayAPI.Data;
+﻿using AirwayAPI.Application;
+using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services.Interfaces;
@@ -13,18 +13,11 @@ namespace AirwayAPI.Controllers.ReportControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PODetailController : ControllerBase
+    public class PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly IEmailService _emailService;
-        private readonly ILogger<PODetailController> _logger;
-
-        public PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger) // Use the interface here
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly eHelpDeskContext _context = context ?? throw new ArgumentNullException(nameof(context));
+        private readonly IEmailService _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+        private readonly ILogger<PODetailController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // GET: api/PODetail/id/{id}
         [HttpGet("id/{id}")]
@@ -189,101 +182,41 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
         }
 
-        private async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
+        private async Task UpdateRequestPOsAndHistory(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
-            _logger.LogInformation("Checking delivery date email conditions for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-            try
+            var requestPOs = await _context.RequestPos
+                .Join(_context.EquipmentRequests,
+                      po => po.RequestId,
+                      req => req.RequestId,
+                      (po, req) => new { po, req })
+                .Where(joined => joined.po.Ponum == poLogEntry.Ponum && joined.req.PartNum == poLogEntry.ItemNum)
+                .Select(joined => joined.po)
+                .ToListAsync();
+
+            foreach (var requestPO in requestPOs)
             {
-                var salesOrder = await _context.QtSalesOrders.FirstOrDefaultAsync(s => s.RwsalesOrderNum == poLogEntry.SalesOrderNum);
-                if (salesOrder == null)
+                // Track the history before updating
+                var history = new RequestPohistory
                 {
-                    _logger.LogWarning("Sales Order not found for SO#{Sonum}", poLogEntry.SalesOrderNum);
-                    return;
-                }
-
-                DateTime? saleReqDate = salesOrder.RequiredDate;
-                if (updateDto.ExpectedDelivery.HasValue && saleReqDate.HasValue &&
-                    updateDto.ExpectedDelivery.Value > saleReqDate.Value)
-                {
-                    if (poLogEntry.DeliveryDateEmail != true)
-                    {
-                        poLogEntry.DeliveryDateEmail = true;
-                        _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-
-                        var salesRep = await _context.Users.FirstOrDefaultAsync(u => u.Id == salesOrder.AccountMgr);
-                        if (salesRep != null && !string.IsNullOrEmpty(salesRep.Email))
-                        {
-                            var emailInput = new PODetailEmailInput
-                            {
-                                ToEmails = [salesRep.Email],
-                                SoNum = poLogEntry.SalesOrderNum ?? "Unknown SO",
-                                SalesRep = salesRep.Uname ?? "Sales Representative",
-                                CompanyName = salesOrder.ShipToCompanyName ?? "Unknown Company",
-                                SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
-                                ExpectedDeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
-                                PartNumber = poLogEntry.ItemNum ?? "Unknown Part",
-                                Notes = updateDto.NewNote ?? "",
-                                Urgent = updateDto.UrgentEmail,
-                                Subject = updateDto.UrgentEmail
-                                    ? $"*** PO#{updateDto.PONum} DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
-                                    : $"PO#{updateDto.PONum} Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}"
-                            };
-
-                            _logger.LogInformation("Sending delay notification email to {ToEmail}", salesRep.Email);
-                            await PODetailUpdateSendEmail(emailInput, updateDto);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Sales representative email not found for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-                throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
-            }
-        }
-
-        private async Task PODetailUpdateSendEmail(PODetailEmailInput emailInput, PODetailUpdateDto updateDto)
-        {
-            _logger.LogInformation("Attempting to send email for Sales Order {Sonum} to {ToEmail}", emailInput.SoNum, emailInput.ToEmails);
-            try
-            {
-                // Prepare the email body content
-                var emailBody = $@"
-                    <h2>{emailInput.Subject}</h2>
-                    <p>The expected delivery date for the following sales order exceeds the required date:</p>
-                    <table>
-                        <tr><th>Sales Order Number</th><td>{emailInput.SoNum}</td></tr>
-                        <tr><th>Company Name</th><td>{emailInput.CompanyName}</td></tr>
-                        <tr><th>Sales Required Date</th><td>{emailInput.SalesRequiredDate}</td></tr>
-                        <tr><th>Expected Delivery Date</th><td>{emailInput.ExpectedDeliveryDate}</td></tr>
-                        <tr><th>Part Number</th><td>{emailInput.PartNumber}</td></tr>
-                        {(string.IsNullOrWhiteSpace(emailInput.Notes) ? "" : $"<tr><th>New Note</th><td>{emailInput.Notes}</td></tr>")}
-                    </table>";
-
-                var email = new EmailInputBase
-                {
-                    FromEmail = null, // Update sendAs permissions if needed
-                    ToEmails = emailInput.ToEmails,
-                    Subject = emailInput.Subject,
-                    Body = emailBody,
-                    UserName = updateDto.UserName,
-                    Password = updateDto.Password,
-                    CCEmails = [],
-                    Attachments = [],
-                    Urgent = emailInput.Urgent
+                    Poid = requestPO.Id,
+                    Ponum = requestPO.Ponum,
+                    DeliveryDate = requestPO.DeliveryDate,
+                    QtyBought = requestPO.QtyBought,
+                    EnteredBy = updateDto.UserId,
+                    EditDate = requestPO.EditDate
                 };
 
-                await _emailService.SendEmailAsync(email);
+                _context.RequestPohistories.Add(history);
+
+                // Update the request PO
+                requestPO.DeliveryDate = updateDto.ExpectedDelivery;
+                requestPO.EditedBy = updateDto.UserId;
+                requestPO.EditDate = DateTime.Now;
+
+                _context.RequestPos.Update(requestPO);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while sending email.");
-                throw new InvalidOperationException($"Error sending email: {ex.Message}", ex);
-            }
+
+            await _context.SaveChangesAsync();
         }
 
         private async Task AddNewNoteAsync(TrkPolog poLogEntry, string note, string enteredBy)
@@ -312,6 +245,69 @@ namespace AirwayAPI.Controllers.ReportControllers
             await InsertCAMActivityAsync(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, note, enteredBy);
         }
 
+        private async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
+        {
+            _logger.LogInformation("Checking delivery date email conditions for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+            try
+            {
+                var salesOrder = await _context.QtSalesOrders.FirstOrDefaultAsync(s => s.RwsalesOrderNum == poLogEntry.SalesOrderNum);
+                if (salesOrder == null)
+                {
+                    _logger.LogWarning("Sales Order not found for SO#{Sonum}", poLogEntry.SalesOrderNum);
+                    return;
+                }
+
+                DateTime? saleReqDate = salesOrder.RequiredDate;
+                if (updateDto.ExpectedDelivery.HasValue && saleReqDate.HasValue &&
+                    updateDto.ExpectedDelivery.Value > saleReqDate.Value)
+                {
+                    if (poLogEntry.DeliveryDateEmail != true)
+                    {
+                        poLogEntry.DeliveryDateEmail = true;
+                        _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+
+                        var salesRep = await _context.Users.FirstOrDefaultAsync(u => u.Id == salesOrder.AccountMgr);
+                        if (salesRep != null && !string.IsNullOrEmpty(salesRep.Email))
+                        {
+                            var placeholders = new Dictionary<string, string>
+                            {
+                                { "{{SoNum}}", poLogEntry.SalesOrderNum ?? "Unknown SO" },
+                                { "{{SalesRep}}", salesRep.Uname ?? "Sales Representative" },
+                                { "{{CompanyName}}", salesOrder.ShipToCompanyName ?? "Unknown Company" },
+                                { "{{SalesRequiredDate}}", saleReqDate.Value.ToShortDateString() },
+                                { "{{ExpectedDeliveryDate}}", updateDto.ExpectedDelivery.Value.ToShortDateString() },
+                                { "{{PartNumber}}", poLogEntry.ItemNum ?? "Unknown Part" },
+                                { "{{Notes}}", updateDto.NewNote ?? "" }
+                            };
+
+                            var emailInput = new EmailInputBase
+                            {
+                                ToEmails = [salesRep.Email],
+                                FromEmail = "ccreech@airway.com",
+                                UserName = updateDto.UserName,
+                                Password = updateDto.Password,
+                                Subject = updateDto.UrgentEmail
+                                    ? $"*** PO#{updateDto.PONum} DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
+                                    : $"PO#{updateDto.PONum} Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}",
+                                Placeholders = placeholders
+                            };
+
+                            await _emailService.SendEmailAsync(emailInput);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Sales representative email not found for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking and sending delivery date email for Sales Order {Sonum}", poLogEntry.SalesOrderNum);
+                throw new InvalidOperationException("Error checking and sending delivery date email.", ex);
+            }
+        }
+
         private async Task<int?> GetContactIdIfMissing(string poNum)
         {
             return await _context.RequestPos
@@ -319,52 +315,6 @@ namespace AirwayAPI.Controllers.ReportControllers
                 .OrderByDescending(rp => rp.ContactId)
                 .Select(rp => rp.ContactId)
                 .FirstOrDefaultAsync();
-        }
-
-        private static void UpdatePODetailFields(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
-        {
-            poLogEntry.EditDate = DateTime.Now;
-            poLogEntry.EditedBy = updateDto.UserId!;
-            poLogEntry.ContactId = updateDto.ContactID;
-            poLogEntry.ExpectedDelivery = updateDto.ExpectedDelivery;
-
-            if (poLogEntry.ExpectedDelivery != updateDto.ExpectedDelivery)
-            {
-                poLogEntry.ExpDelEditDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            }
-        }
-
-        private async Task UpdateRequestPOsAndHistory(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
-        {
-            var requestPOs = await _context.RequestPos
-                .Join(_context.EquipmentRequests,
-                      po => po.RequestId,
-                      req => req.RequestId,
-                      (po, req) => new { po, req })
-                .Where(joined => joined.po.Ponum == poLogEntry.Ponum && joined.req.PartNum == poLogEntry.ItemNum)
-                .Select(joined => joined.po)
-                .ToListAsync();
-
-            foreach (var requestPO in requestPOs)
-            {
-                var history = new RequestPohistory
-                {
-                    Poid = requestPO.Id,
-                    Ponum = requestPO.Ponum,
-                    DeliveryDate = requestPO.DeliveryDate,
-                    QtyBought = requestPO.QtyBought,
-                    EnteredBy = updateDto.UserId,
-                    EditDate = requestPO.EditDate
-                };
-
-                _context.RequestPohistories.Add(history);
-                requestPO.DeliveryDate = updateDto.ExpectedDelivery;
-                requestPO.EditedBy = updateDto.UserId;
-                requestPO.EditDate = DateTime.Now;
-                _context.RequestPos.Update(requestPO);
-            }
-
-            await _context.SaveChangesAsync();
         }
 
         private async Task UpdateAllPODeliveryDates(string poNum, DateTime? expectedDelivery, int userId)
@@ -404,6 +354,19 @@ namespace AirwayAPI.Controllers.ReportControllers
             };
 
             await _context.CamActivities.AddAsync(camActivity);
+        }
+
+        private static void UpdatePODetailFields(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
+        {
+            poLogEntry.EditDate = DateTime.Now;
+            poLogEntry.EditedBy = updateDto.UserId!;
+            poLogEntry.ContactId = updateDto.ContactID;
+            poLogEntry.ExpectedDelivery = updateDto.ExpectedDelivery;
+
+            if (poLogEntry.ExpectedDelivery != updateDto.ExpectedDelivery)
+            {
+                poLogEntry.ExpDelEditDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            }
         }
     }
 }
