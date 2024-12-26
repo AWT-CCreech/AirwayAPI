@@ -1,18 +1,21 @@
 ﻿using AirwayAPI.Application;
 using AirwayAPI.Assets;
+using AirwayAPI.Data;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Services.Interfaces;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using MimeKit.Utils;
 
 namespace AirwayAPI.Services
 {
-    public class EmailService(ILogger<EmailService> logger, IConfiguration configuration) : IEmailService
+    public class EmailService(ILogger<EmailService> logger, IConfiguration configuration, eHelpDeskContext context) : IEmailService
     {
         private readonly ILogger<EmailService> _logger = logger;
         private readonly IConfiguration _configuration = configuration;
+        private readonly eHelpDeskContext _context = context;
 
         public async Task SendEmailAsync(EmailInputBase emailInput)
         {
@@ -26,7 +29,6 @@ namespace AirwayAPI.Services
             var message = CreateEmailMessage(emailInput);
 
             using var client = new SmtpClient();
-
             try
             {
                 // Connect to SMTP server
@@ -63,32 +65,29 @@ namespace AirwayAPI.Services
             }
         }
 
-        private void OverrideRecipientForDevelopment(EmailInputBase emailInput)
+        public async Task<(string FullName, string Email, string JobTitle, string DirectPhone, string MobilePhone)> GetSenderInfoAsync(string username)
         {
-            if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
+            var normalizedUserName = username.Trim().ToLower();
+            var senderInfo = await _context.Users
+                .Where(user => user.Uname != null && user.Uname.Trim().ToLower() ==
+                    (normalizedUserName == "lvonder" ? "lvonderporten" : normalizedUserName))
+                .Select(user => new
+                {
+                    FullName = $"{user.Fname} {user.Lname}".Trim(),
+                    user.Email,
+                    user.JobTitle,
+                    user.DirectPhone,
+                    user.MobilePhone
+                })
+                .FirstOrDefaultAsync();
+
+            if (senderInfo == null)
             {
-                var currentUserEmail = GetCurrentUserEmail();
-                _logger.LogWarning("Development mode: Overriding all recipients to {CurrentUserEmail}", currentUserEmail);
-
-                // Replace recipients with the current user's email
-                emailInput.ToEmails = [currentUserEmail];
-                emailInput.CCEmails = [];
+                _logger.LogWarning("Sender information not found for {Username}", username);
+                return ("System", $"{username}@airway.com", "N/A", "N/A", "N/A");
             }
-        }
 
-        private string GetCurrentUserEmail()
-        {
-            return _configuration.GetValue<string>("DevEmail") ?? "ccreech@airway.com";
-        }
-
-        private (string Server, int Port, bool UseSsl) GetSmtpConfiguration()
-        {
-            var emailSettings = _configuration.GetSection("EmailSettings");
-            return (
-                Server: emailSettings["SmtpServer"] ?? throw new InvalidOperationException("SMTP Server is not configured."),
-                Port: emailSettings.GetValue<int>("SmtpPort"),
-                UseSsl: emailSettings.GetValue<bool>("EnableSsl")
-            );
+            return (senderInfo.FullName, senderInfo.Email, senderInfo.JobTitle ?? "N/A", senderInfo.DirectPhone ?? "N/A", senderInfo.MobilePhone ?? "N/A");
         }
 
         private static MimeMessage CreateEmailMessage(EmailInputBase emailInput)
@@ -164,17 +163,44 @@ namespace AirwayAPI.Services
         private static string ApplyEmailStyling(string bodyContent)
         {
             return $@"
-                <html>
-                <head>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; line-height: 1.5; }}
-                        .email-body {{ padding: 20px; }}
-                    </style>
-                </head>
-                <body class='email-body'>
-                    {bodyContent}
-                </body>
-                </html>";
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; line-height: 1.5; }}
+                    .email-body {{ padding: 20px; }}
+                </style>
+            </head>
+            <body class='email-body'>
+                {bodyContent}
+            </body>
+            </html>";
+        }
+
+        private void OverrideRecipientForDevelopment(EmailInputBase emailInput)
+        {
+            if (_configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") == "Development")
+            {
+                var developerEmail = GetDeveloperEmail();
+                _logger.LogWarning("Development mode: Overriding all recipients to {CurrentUserEmail}", developerEmail);
+
+                emailInput.ToEmails = new List<string> { developerEmail };
+                emailInput.CCEmails = new List<string>();
+            }
+        }
+
+        private string GetDeveloperEmail()
+        {
+            return _configuration.GetValue<string>("EmailSettings:DevEmail") ?? "ccreech@airway.com";
+        }
+
+        private (string Server, int Port, bool UseSsl) GetSmtpConfiguration()
+        {
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            return (
+                Server: emailSettings["SmtpServer"] ?? throw new InvalidOperationException("SMTP Server is not configured."),
+                Port: emailSettings.GetValue<int>("SmtpPort"),
+                UseSsl: emailSettings.GetValue<bool>("EnableSsl")
+            );
         }
     }
 }
