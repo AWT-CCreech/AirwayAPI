@@ -150,5 +150,21 @@ namespace AirwayAPI.Controllers.ReportControllers
                 return StatusCode(500, "Error updating sales order.");
             }
         }
+
+        // POST: api/SalesOrderWorkbench/UpdateEquipmentRequest
+        [HttpPost("UpdateEquipmentRequest")]
+        public async Task<IActionResult> UpdateEquipmentRequest([FromBody] EquipmentRequestUpdateDto request)
+        {
+            try
+            {
+                await _salesOrderService.UpdateEquipmentRequestAsync(request); // Add this method to the service
+                return Ok("Equipment request updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error updating equipment request: {Message}", ex.Message);
+                return StatusCode(500, "Error updating equipment request.");
+            }
+        }
     }
 }
