@@ -43,7 +43,7 @@ namespace AirwayAPI.Services
             try
             {
                 var salesOrderDetail = await _context.QtSalesOrderDetails
-                    .FirstOrDefaultAsync(d => d.Id == id);
+                    .FirstOrDefaultAsync(d => d.RequestId == id);
 
                 return salesOrderDetail ?? throw new Exception($"Sales order detail with ID {id} not found.");
             }
