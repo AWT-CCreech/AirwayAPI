@@ -1,83 +1,125 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Services
 {
-    public class EquipmentRequestService(eHelpDeskContext context, ILogger<EquipmentRequestService> logger) : IEquipmentRequestService
+    public class EquipmentRequestService : IEquipmentRequestService
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<EquipmentRequestService> _logger = logger;
+        private readonly eHelpDeskContext _context;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<EquipmentRequestService> _logger;
+
+        public EquipmentRequestService(
+            eHelpDeskContext context,
+            IEmailService emailService,
+            ILogger<EquipmentRequestService> logger)
+        {
+            _context = context;
+            _emailService = emailService;
+            _logger = logger;
+        }
 
         public async Task ProcessEquipmentRequest(QtSalesOrderDetail detail, SalesOrderUpdateDto request)
         {
+            _logger.LogInformation("Processing EquipmentRequest for RequestId {RequestId} with DropShipment: {DropShipment}", detail.RequestId, request.DropShipment);
+
             var equipmentRequest = await _context.EquipmentRequests
                 .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId)
                 ?? throw new Exception($"EquipmentRequest with RequestID {detail.RequestId} not found.");
 
-            equipmentRequest.SalesOrderNum = UpdateSalesOrderNum(equipmentRequest.SalesOrderNum ?? "", request.RWSalesOrderNum);
+            equipmentRequest.SalesOrderNum = UpdateSalesOrderNum(equipmentRequest.SalesOrderNum ?? "", request.SalesOrderNum);
             equipmentRequest.Status = "Sold";
             equipmentRequest.SalePrice = detail.UnitPrice;
             equipmentRequest.MarkedSoldDate = DateTime.Now;
             equipmentRequest.QtySold = (equipmentRequest.QtySold ?? 0) + (detail.QtySold ?? 0);
             equipmentRequest.DropShipment = request.DropShipment;
+            _logger.LogInformation("Updated EquipmentRequest DropShipment to: {DropShipment}", equipmentRequest.DropShipment);
 
+            // Possibly decide if it’s "bought" 
             if (await ShouldMarkAsBoughtAsync(equipmentRequest, detail.QtySold ?? 0))
             {
                 equipmentRequest.Bought = true;
                 _context.TrkSoldItemHistories.Add(new TrkSoldItemHistory
                 {
                     RequestId = equipmentRequest.RequestId,
+                    DateMarkedBought = DateTime.Now,
                     Username = request.Username,
-                    PageName = "SalesOrderWorkbenchController(UpdateSalesOrder)"
+                    PageName = "EquipmentRequestService.cs (ProcessEquipmentRequest)"
                 });
             }
 
             await _context.SaveChangesAsync();
         }
 
-        public async Task<QtSalesOrderDetail> GetSalesOrderDetailByIdAsync(int id)
+        public async Task UpdateEquipmentRequestAsync(EquipmentRequestUpdateDto request)
         {
             try
             {
-                var salesOrderDetail = await _context.QtSalesOrderDetails
-                    .FirstOrDefaultAsync(d => d.RequestId == id);
+                var detail = await _context.EquipmentRequests
+                    .FirstOrDefaultAsync(d => d.RequestId == request.RequestId)
+                    ?? throw new Exception($"Request ID#{request.RequestId} not found.");
 
-                return salesOrderDetail ?? throw new Exception($"Sales order detail with ID {id} not found.");
+                detail.DropShipment = request.DropShipment;
+
+                await _context.SaveChangesAsync();
+
+                // Possibly notify via email
+                await NotifyEquipmentRequestChanges(request, detail);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error fetching SalesOrderDetail by ID {Id}: {Message}", id, ex.Message);
+                _logger.LogError("Error in UpdateEquipmentRequestAsync: {Message}", ex.Message);
                 throw;
             }
         }
 
-        /// <summary>
-        /// Updates the SalesOrderNum with the value provided by the user from the frontend. 
-        /// Currently, this method directly replaces the existing value with the new input.
-        /// 
-        /// Potential for Future Enhancements:
-        /// - Maintain a history of changes to SalesOrderNum for auditing purposes.
-        /// - Add validation or formatting logic to ensure the input aligns with business rules.
-        /// - Implement hooks for logging updates to track user changes over time.
-        /// </summary>
-        /// <param name="existing">The current SalesOrderNum stored in the database.</param>
-        /// <param name="newNum">The new SalesOrderNum provided by the user.</param>
-        /// <returns>The updated SalesOrderNum, replacing the existing value entirely.</returns>
+        private async Task NotifyEquipmentRequestChanges(EquipmentRequestUpdateDto request, EquipmentRequest equipmentRequest)
+        {
+            var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
+
+            var placeholders = new Dictionary<string, string>
+            {
+                { "%%EMAILBODY%%", $"SO#{equipmentRequest.SalesOrderNum} has been updated." },
+                { "%%NAME%%", senderInfo.FullName },
+                { "%%EMAIL%%", senderInfo.Email },
+                { "%%JOBTITLE%%", senderInfo.JobTitle },
+                { "%%DIRECT%%", senderInfo.DirectPhone },
+                { "%%MOBILE%%", senderInfo.MobilePhone }
+            };
+
+            var emailInput = new EmailInputBase
+            {
+                FromEmail = senderInfo.Email,
+                ToEmails = new List<string> { "ccreech@airway.com" },
+                Subject = $"Sales Order {equipmentRequest.SalesOrderNum} Updated",
+                Body = "%%EMAILBODY%%",
+                Placeholders = placeholders,
+                UserName = request.Username,
+                Password = request.Password
+            };
+
+            await _emailService.SendEmailAsync(emailInput);
+        }
+
         private static string UpdateSalesOrderNum(string existing, string newNum)
         {
+            // Currently a 1:1 replacement
             return newNum;
         }
 
         private async Task<bool> ShouldMarkAsBoughtAsync(EquipmentRequest request, int qtySold)
         {
+            // Original logic to see if “bought” should be set
             var inventory = await _context.TrkRwImItems
                 .FirstOrDefaultAsync(i => i.ItemNum == request.PartNum || i.AltPartNum == request.PartNum);
 
             int QtyOnHand = inventory?.QtyOnHand ?? 0;
             int QtyInPick = inventory?.QtyInPick ?? 0;
+
             int Adjustments = await _context.TrkAdjustments
                 .Where(a => a.ItemNum == request.PartNum && a.EntryDate == DateTime.Today)
                 .SumAsync(a => a.QtyAdjustment) ?? 0;
@@ -87,11 +129,12 @@ namespace AirwayAPI.Services
                 .SumAsync(r => r.QtyBought) ?? 0;
 
             int QtySoldToday = await _context.EquipmentRequests
-                .Where(e => e.PartNum == request.PartNum && e.Status == "Sold" && e.MarkedSoldDate.HasValue && e.MarkedSoldDate.Value.Date == DateTime.Today)
+                .Where(e => e.PartNum == request.PartNum && e.Status == "Sold" &&
+                            e.MarkedSoldDate.HasValue && e.MarkedSoldDate.Value.Date == DateTime.Today)
                 .SumAsync(e => e.QtySold) ?? 0;
 
             int QtyAvailToSell = QtyOnHand + Adjustments - QtyInPick - QtySoldToday;
-            return qtySold - QtyAvailToSell - QtyBought <= 0;
+            return (qtySold - QtyAvailToSell - QtyBought) <= 0;
         }
     }
 }
