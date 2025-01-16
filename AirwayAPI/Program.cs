@@ -1,12 +1,12 @@
 using AirwayAPI.Data;
 using AirwayAPI.Services;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
-using AirwayAPI.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +39,7 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEquipmentRequestService, EquipmentRequestService>();
 builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
+builder.Services.AddScoped<ISalesOrderWorkbenchService, SalesOrderWorkbenchService>();
 builder.Services.AddScoped<IQuoteService, QuoteService>();
 builder.Services.AddScoped<IStringService, StringService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
