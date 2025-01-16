@@ -5,36 +5,40 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Services
 {
-    public class QuoteService(eHelpDeskContext context, ILogger<QuoteService> logger) : IQuoteService
+    public class QuoteService : IQuoteService
     {
-        private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<QuoteService> _logger = logger;
+        private readonly eHelpDeskContext _context;
+        private readonly ILogger<QuoteService> _logger;
 
-        /// <summary>
-        /// Updates the related quote in the qtQuote table with sales order and drop shipment details.
-        /// </summary>
-        /// <param name="salesOrderUpdate">The sales order update details.</param>
-        /// <returns></returns>
+        public QuoteService(eHelpDeskContext context, ILogger<QuoteService> logger)
+        {
+            _context = context;
+            _logger = logger;
+        }
+
         public async Task UpdateQuoteAsync(SalesOrderUpdateDto salesOrderUpdate)
         {
             try
             {
                 // Fetch the related quote
                 var relatedQuote = await _context.QtQuotes
-                    .FirstOrDefaultAsync(q => q.QuoteId == salesOrderUpdate.QuoteId && q.EventId == salesOrderUpdate.EventId);
+                    .FirstOrDefaultAsync(q => q.QuoteId == salesOrderUpdate.QuoteId &&
+                                              q.EventId == salesOrderUpdate.EventId);
 
                 if (relatedQuote == null)
                 {
-                    _logger.LogWarning("No related quote found for Quote ID: {QuoteId} and Event ID: {EventId}", salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
+                    _logger.LogWarning("No related quote found for Quote ID: {QuoteId} and Event ID: {EventId}",
+                        salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
                     return;
                 }
 
-                // Update the quote's Sales Order Number and Drop Shipment status
-                relatedQuote.RwsalesOrderNum = salesOrderUpdate.RWSalesOrderNum.Replace(";", ",");
+                // Update the quote's Sales Order Number
+                relatedQuote.RwsalesOrderNum = salesOrderUpdate.SalesOrderNum.Replace(";", ",");
 
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Successfully updated related quote for Quote ID: {QuoteId} and Event ID: {EventId}", salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
+                _logger.LogInformation("Successfully updated related quote for Quote ID: {QuoteId} & Event ID: {EventId}",
+                    salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
             }
             catch (Exception ex)
             {
