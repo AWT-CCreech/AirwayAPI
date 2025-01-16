@@ -1,6 +1,4 @@
-﻿using AirwayAPI.Data;
-using AirwayAPI.Models.DTOs;
-using AirwayAPI.Services.Interfaces;
+﻿using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,18 +10,15 @@ namespace AirwayAPI.Controllers.ReportControllers
     [Route("api/[controller]")]
     public class SalesOrderWorkbenchController : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
+        private readonly ISalesOrderWorkbenchService _workbenchService;
         private readonly ILogger<SalesOrderWorkbenchController> _logger;
-        private readonly ISalesOrderService _salesOrderService;
 
         public SalesOrderWorkbenchController(
-            eHelpDeskContext context,
-            ILogger<SalesOrderWorkbenchController> logger,
-            ISalesOrderService salesOrderService)
+            ISalesOrderWorkbenchService workbenchService,
+            ILogger<SalesOrderWorkbenchController> logger)
         {
-            _context = context;
+            _workbenchService = workbenchService;
             _logger = logger;
-            _salesOrderService = salesOrderService;
         }
 
         // GET: api/SalesOrderWorkbench/EventLevelData
@@ -35,45 +30,12 @@ namespace AirwayAPI.Controllers.ReportControllers
         {
             try
             {
-                var query = from so in _context.QtSalesOrders
-                            join u in _context.Users on so.AccountMgr equals u.Id into userJoin
-                            from u in userJoin.DefaultIfEmpty()
-                            where so.RwsalesOrderNum == "0" && so.Draft == false
-                            select new
-                            {
-                                so.SaleId,
-                                so.EventId,
-                                so.QuoteId,
-                                so.Version,
-                                so.BillToCompanyName,
-                                so.SaleTotal,
-                                so.SaleDate,
-                                so.AccountMgr,
-                                SalesRep = u != null ? u.Uname : "N/A"
-                            };
-
-                if (eventId.HasValue && eventId.Value != 0)
-                {
-                    query = query.Where(q => q.EventId == eventId.Value);
-                }
-                else
-                {
-                    if (salesRepId.HasValue && salesRepId.Value != 0)
-                        query = query.Where(q => q.AccountMgr == salesRepId.Value);
-
-                    if (!string.IsNullOrWhiteSpace(billToCompany))
-                        query = query.Where(q => q.BillToCompanyName.StartsWith(billToCompany));
-                }
-
-                var result = await query
-                    .OrderBy(q => q.EventId)
-                    .ToListAsync();
-
-                return Ok(result);
+                var results = await _workbenchService.GetEventLevelDataAsync(salesRepId, billToCompany, eventId);
+                return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetEventLevelData: {ex.Message}", ex);
+                _logger.LogError("Error in GetEventLevelData: {Message}", ex.Message);
                 return StatusCode(500, "Error fetching Event Level Data");
             }
         }
@@ -87,83 +49,13 @@ namespace AirwayAPI.Controllers.ReportControllers
         {
             try
             {
-                var query = from d in _context.QtSalesOrderDetails
-                            join so in _context.QtSalesOrders on d.SaleId equals so.SaleId
-                            join u in _context.Users on so.AccountMgr equals u.Id into userJoin
-                            from u in userJoin.DefaultIfEmpty()
-                            where d.Soflag == true
-                            select new
-                            {
-                                d.Id,
-                                d.RequestId,
-                                d.QtySold,
-                                d.UnitMeasure,
-                                d.PartNum,
-                                d.PartDesc,
-                                d.UnitPrice,
-                                d.ExtendedPrice,
-                                so.RwsalesOrderNum,
-                                so.EventId,
-                                so.BillToCompanyName,
-                                so.AccountMgr,
-                                SalesRep = u != null ? u.Uname : "N/A"
-                            };
-
-                if (eventId.HasValue && eventId.Value != 0)
-                {
-                    query = query.Where(q => q.EventId == eventId.Value);
-                }
-                else
-                {
-                    if (salesRepId.HasValue && salesRepId.Value != 0)
-                        query = query.Where(q => q.AccountMgr == salesRepId.Value);
-
-                    if (!string.IsNullOrWhiteSpace(billToCompany))
-                        query = query.Where(q => q.BillToCompanyName.StartsWith(billToCompany));
-                }
-
-                var result = await query
-                    .OrderBy(q => q.RequestId)
-                    .ToListAsync();
-
-                return Ok(result);
+                var results = await _workbenchService.GetDetailLevelDataAsync(salesRepId, billToCompany, eventId);
+                return Ok(results);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetDetailLevelData: {ex.Message}", ex);
+                _logger.LogError("Error in GetDetailLevelData: {Message}", ex.Message);
                 return StatusCode(500, "Error fetching Detail Level Data");
-            }
-        }
-
-        // POST: api/SalesOrderWorkbench/UpdateSalesOrder
-        [HttpPost("UpdateSalesOrder")]
-        public async Task<IActionResult> UpdateSalesOrder([FromBody] SalesOrderUpdateDto request)
-        {
-            try
-            {
-                await _salesOrderService.UpdateSalesOrderAsync(request);
-                return Ok("Sales Order updated successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error updating sales order: {ex.Message}", ex);
-                return StatusCode(500, "Error updating sales order.");
-            }
-        }
-
-        // POST: api/SalesOrderWorkbench/UpdateEquipmentRequest
-        [HttpPost("UpdateEquipmentRequest")]
-        public async Task<IActionResult> UpdateEquipmentRequest([FromBody] EquipmentRequestUpdateDto request)
-        {
-            try
-            {
-                await _salesOrderService.UpdateEquipmentRequestAsync(request); // Add this method to the service
-                return Ok("Equipment request updated successfully.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error updating equipment request: {Message}", ex.Message);
-                return StatusCode(500, "Error updating equipment request.");
             }
         }
     }
