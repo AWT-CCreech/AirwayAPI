@@ -3,7 +3,7 @@
     public class EquipmentRequestUpdateDto
     {
         public int RequestId { get; set; }
-        public string RWSalesOrderNum { get; set; } = string.Empty;
+        public string SalesOrderNum { get; set; } = string.Empty;
         public bool DropShipment { get; set; }
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
