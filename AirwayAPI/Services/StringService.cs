@@ -10,9 +10,22 @@ namespace AirwayAPI.Services
 
         public string ReplaceDelimiters(string input)
         {
-            return string.IsNullOrWhiteSpace(input)
-                ? input
-                : DelimiterRegex().Replace(input, ",");
+            // If input is null or whitespace, just return it as-is
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return input;
+            }
+
+            // Trim whitespace and replace all delimiters with a comma
+            string replaced = DelimiterRegex().Replace(input.Trim(), ",");
+
+            // Remove a leading comma if it exists
+            if (replaced.StartsWith(","))
+            {
+                replaced = replaced[1..];
+            }
+
+            return replaced;
         }
     }
 }
