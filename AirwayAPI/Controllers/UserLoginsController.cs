@@ -15,11 +15,13 @@ namespace AirwayAPI.Controllers
     public class UserLoginsController(
         eHelpDeskContext context,
         ILogger<UserLoginsController> logger,
-        ITokenService tokenService) : ControllerBase
+        ITokenService tokenService,
+        IUserService userService) : ControllerBase
     {
         private readonly eHelpDeskContext _context = context;
         private readonly ILogger<UserLoginsController> _logger = logger;
         private readonly ITokenService _tokenService = tokenService; // Inject ITokenService
+        private readonly IUserService _userService = userService; // Inject IUserService
         private static readonly string[] predefinedUserArray = ["mgibson", "lvonder", "kgildersleeve"];
 
         [HttpPost]
@@ -65,7 +67,7 @@ namespace AirwayAPI.Controllers
                     return StatusCode(401, new { message = "Authentication failed." });
                 }
 
-                int userid = await GetUserIdAsync(usernameTrimmedLower);
+                int userid = await _userService.GetUserIdAsync(usernameTrimmedLower);
                 var token = _tokenService.GenerateJwtToken(login.username);
 
                 // Re-encrypt the password before sending it back to the client
@@ -101,20 +103,6 @@ namespace AirwayAPI.Controllers
                 _logger.LogError(ex, "Failed to authenticate user: {Username}", username);
                 return AuthenticationResult.Failure();
             }
-        }
-
-        private async Task<int> GetUserIdAsync(string username)
-        {
-            return username switch
-            {
-                "mgibson" => 125,
-                "lvonder" => 65,
-                "kgildersleeve" => 229,
-                _ => await _context.Users
-                                   .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == username)
-                                   .Select(u => u.Id)
-                                   .FirstOrDefaultAsync()
-            };
         }
 
         private static bool IsPredefinedUser(string username) => predefinedUserArray.Contains(username);
