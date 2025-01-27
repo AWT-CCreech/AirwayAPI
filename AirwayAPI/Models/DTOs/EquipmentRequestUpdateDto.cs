@@ -2,9 +2,9 @@
 {
     public class EquipmentRequestUpdateDto
     {
+        public int EventId { get; set; }
         public int RequestId { get; set; }
         public string SalesOrderNum { get; set; } = string.Empty;
-        public bool DropShipment { get; set; }
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
