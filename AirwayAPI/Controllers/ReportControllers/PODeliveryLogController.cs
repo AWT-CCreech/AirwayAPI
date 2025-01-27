@@ -148,7 +148,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
 
             // PO Status Filtering
-            var normalizedPOStatus = POStatus.ToLower();
+            string? normalizedPOStatus = POStatus?.ToLower() ?? "not complete";
             switch (normalizedPOStatus)
             {
                 case "not complete":
