@@ -179,74 +179,84 @@ namespace AirwayAPI.Services
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1) Retrieve NEW EventID based on `request.SalesOrderNum`
+                // 1a) Retrieve NEW EventID based on `request.SalesOrderNum`
                 var query = _context.EquipmentRequests
                     .Where(er => er.SalesOrderNum == request.SalesOrderNum)
                     .Select(er => er.EventId);
 
-                // 2) Get the raw SQL for logging/debugging
+                // 1b) Get the raw SQL for logging/debugging
                 var rawSql = query.ToQueryString();
                 _logger.LogDebug("SQL Query for retrieving EventID: {rawSql}", rawSql);
 
-                // 3) Execute the query and retrieve the result
+                // 1c) Execute the query and retrieve the result
                 var checkEventID = await query.FirstOrDefaultAsync()
                     ?? throw new Exception($"EventID not found for SalesOrderNum {request.SalesOrderNum}");
 
                 _logger.LogDebug("EventID found for SalesOrderNum {0}: {1}", request.SalesOrderNum, checkEventID);
 
-                // 2) Update the QtSalesOrders record
+                // 2a) Retrieve the QtSalesOrderDetail record based on `request.RequestId`
                 var salesOrderDetail = await _context.QtSalesOrderDetails
                     .FirstOrDefaultAsync(so => so.RequestId == request.RequestId)
                     ?? throw new Exception($"Sales Order Detail with RequestID#{request.RequestId} not found.");
-                // [TO-DO] Instead of relying on overnight scripts, update Soflag during this update to provide better UX 
-                //salesOrderDetail.Soflag = false;
-                //_context.QtSalesOrderDetails.Update(salesOrderDetail);
-                //await _context.SaveChangesAsync();
 
+                // 2b) [Optional To-Do] Update the Soflag to improve UX by avoiding reliance on overnight scripts
+                // salesOrderDetail.Soflag = false;
+                // _context.QtSalesOrderDetails.Update(salesOrderDetail);
+                // await _context.SaveChangesAsync();
+
+                // 2c) Retrieve the QtSalesOrder record and ensure the EventID is updated
                 var salesOrder = await _context.QtSalesOrders
                     .FirstOrDefaultAsync(so => so.SaleId == salesOrderDetail.SaleId)
-                    ?? throw new Exception($"Sales Order with SaleID#{salesOrderDetail.SaleId} now found");
-                // For instance, updating RwsalesOrderNum with "ReplaceDelimiters"
+                    ?? throw new Exception($"Sales Order with SaleID#{salesOrderDetail.SaleId} not found");
+
                 if (salesOrder.EventId != checkEventID)
                     salesOrder.EventId = checkEventID;
+
+                // 2d) Update the RwsalesOrderNum and EditDate fields
                 salesOrder.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
                 salesOrder.EditDate = DateTime.Now;
 
+                // 2e) Save the updated QtSalesOrder
                 _context.QtSalesOrders.Update(salesOrder);
                 await _context.SaveChangesAsync();
 
-                // 3) Update the QtQuote record
+                // 3a) Retrieve the QtQuote record associated with the SalesOrder's EventID
                 var quote = await _context.QtQuotes
                     .Where(qt => qt.RwsalesOrderNum.Length > 0
-                                 && qt.Approved == true  // or (qt.Approved ?? false)
+                                 && qt.Approved == true
                                  && qt.EventId == salesOrder.EventId)
                     .FirstOrDefaultAsync()
                     ?? throw new Exception($"Quote with EventID#{salesOrder.EventId} not found");
 
+                // 3b) Update the EventID and RwsalesOrderNum fields in the quote
                 if (quote.EventId != checkEventID)
                     quote.EventId = checkEventID;
                 quote.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
 
+                // 3c) Save the updated QtQuote record
                 _context.QtQuotes.Update(quote);
                 await _context.SaveChangesAsync();
 
-                // 4) Update the EquipmentRequest
+                // 4a) Retrieve the EquipmentRequest record based on `request.RequestId`
                 var detail = await _context.EquipmentRequests
                     .FirstOrDefaultAsync(d => d.RequestId == request.RequestId)
                     ?? throw new Exception($"EquipmentRequest with RequestId #{request.RequestId} not found.");
 
+                // 4b) Update the EventID, SalesOrderNum, ModifiedBy, and ModifiedDate fields
                 if (detail.EventId != checkEventID)
                     detail.EventId = checkEventID;
                 detail.SalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
                 detail.ModifiedBy = await _userService.GetUserIdAsync(request.Username);
                 detail.ModifiedDate = DateTime.Now;
 
+                // 4c) Save the updated EquipmentRequest record
                 _context.EquipmentRequests.Update(detail);
                 await _context.SaveChangesAsync();
 
-                // Possibly notify via email
+                // 5a) Notify relevant stakeholders via email about the EquipmentRequest changes
                 await NotifyEquipmentRequestChanges(request, detail);
 
+                // 5b) Commit the transaction to ensure all updates are saved atomically
                 await transaction.CommitAsync();
             }
             catch (Exception ex)
