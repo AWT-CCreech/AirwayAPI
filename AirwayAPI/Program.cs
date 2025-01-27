@@ -37,12 +37,10 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 
 // Register services with their corresponding interfaces
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IEquipmentRequestService, EquipmentRequestService>();
-builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<ISalesOrderWorkbenchService, SalesOrderWorkbenchService>();
-builder.Services.AddScoped<IQuoteService, QuoteService>();
 builder.Services.AddScoped<IStringService, StringService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 // Register IHttpContextAccessor to access HttpContext from service classes
 builder.Services.AddHttpContextAccessor();
