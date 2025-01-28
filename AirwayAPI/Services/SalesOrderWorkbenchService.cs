@@ -3,7 +3,9 @@ using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Services.Interfaces;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace AirwayAPI.Services
@@ -157,7 +159,7 @@ namespace AirwayAPI.Services
                 }
 
                 // 4) (Optional) Send email notifications about the sales order change
-                await NotifySalesOrderChanges(request, salesOrder);
+                await NotifyEventLevelChanges(request, salesOrder);
 
                 await transaction.CommitAsync();
             }
@@ -254,7 +256,7 @@ namespace AirwayAPI.Services
                 await _context.SaveChangesAsync();
 
                 // 5a) Notify relevant stakeholders via email about the EquipmentRequest changes
-                await NotifyEquipmentRequestChanges(request, detail);
+                await NotifyDetailLevelChanges(request, detail);
 
                 // 5b) Commit the transaction to ensure all updates are saved atomically
                 await transaction.CommitAsync();
@@ -301,6 +303,7 @@ namespace AirwayAPI.Services
 
             // Enough stock to mark as Bought?
             bool canMarkAsBought = await ShouldMarkAsBoughtAsync(equipmentRequest, detail.QtySold ?? 0);
+            _logger.LogInformation("EquipmentRequest {RequestId} can be marked as Bought: {canMarkAsBought}", detail.RequestId, canMarkAsBought);
             if (canMarkAsBought)
             {
                 equipmentRequest.Bought = true;
@@ -373,7 +376,7 @@ namespace AirwayAPI.Services
 
             if (relatedQuote == null)
             {
-                _logger.LogWarning("No related quote found for QuoteID {0} and EventID {1}",
+                _logger.LogWarning("No related quote found for QuoteID {QuoteId} and EventID {EventId}",
                     salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
                 return;
             }
@@ -382,7 +385,7 @@ namespace AirwayAPI.Services
             relatedQuote.RwsalesOrderNum = salesOrderUpdate.SalesOrderNum.Replace(";", ",");
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Successfully updated related quote for QuoteID {0} & EventID {1}",
+            _logger.LogInformation("Successfully updated related quote for QuoteID {QuoteId} & EventID {EventId}",
                 salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
         }
 
@@ -392,22 +395,22 @@ namespace AirwayAPI.Services
         /// <param name="request"></param>
         /// <param name="salesOrder"></param>
         /// <returns></returns>
-        private async Task NotifySalesOrderChanges(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
+        private async Task NotifyEventLevelChanges(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
         {
-            var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
+            var (FullName, Email, JobTitle, DirectPhone, MobilePhone) = await _emailService.GetSenderInfoAsync(request.Username);
             var placeholders = new Dictionary<string, string>
             {
                 { "%%EMAILBODY%%", $"SO#{salesOrder.RwsalesOrderNum} has been updated." },
-                { "%%NAME%%", senderInfo.FullName },
-                { "%%EMAIL%%", senderInfo.Email },
-                { "%%JOBTITLE%%", senderInfo.JobTitle },
-                { "%%DIRECT%%", senderInfo.DirectPhone },
-                { "%%MOBILE%%", senderInfo.MobilePhone }
+                { "%%NAME%%", FullName },
+                { "%%EMAIL%%", Email },
+                { "%%JOBTITLE%%", JobTitle },
+                { "%%DIRECT%%", DirectPhone },
+                { "%%MOBILE%%", MobilePhone }
             };
 
             var emailInput = new EmailInputBase
             {
-                FromEmail = senderInfo.Email,
+                FromEmail = Email,
                 ToEmails = new List<string> { "ccreech@airway.com" },
                 Subject = $"Sales Order {salesOrder.RwsalesOrderNum} Updated",
                 Body = "%%EMAILBODY%%",
@@ -425,7 +428,7 @@ namespace AirwayAPI.Services
         /// <param name="request"></param>
         /// <param name="equipmentRequest"></param>
         /// <returns></returns>
-        private async Task NotifyEquipmentRequestChanges(EquipmentRequestUpdateDto request, EquipmentRequest equipmentRequest)
+        private async Task NotifyDetailLevelChanges(EquipmentRequestUpdateDto request, EquipmentRequest equipmentRequest)
         {
             var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
             var placeholders = new Dictionary<string, string>
