@@ -62,7 +62,7 @@ namespace AirwayAPI.Controllers.CamControllers
             catch (Exception ex)
             {
                 // Log the exception as needed
-                return StatusCode(500, "An error occurred while processing your request.");
+                return StatusCode(500, $"An error occurred while processing your request: {ex}");
             }
         }
 
@@ -81,7 +81,7 @@ namespace AirwayAPI.Controllers.CamControllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to retrieve search fields.");
+                return StatusCode(500, $"Failed to retrieve search fields: {ex}");
             }
         }
 
@@ -100,7 +100,7 @@ namespace AirwayAPI.Controllers.CamControllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to retrieve advanced search fields.");
+                return StatusCode(500, $"Failed to retrieve advanced search fields: {ex}");
             }
         }
 
@@ -119,7 +119,7 @@ namespace AirwayAPI.Controllers.CamControllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to retrieve contact types.");
+                return StatusCode(500, $"Failed to retrieve contact types: {ex}");
             }
         }
     }
