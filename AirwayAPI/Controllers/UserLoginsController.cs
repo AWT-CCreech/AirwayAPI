@@ -60,7 +60,7 @@ namespace AirwayAPI.Controllers
                     }
                 }
 
-                var authResult = await AuthenticateUserAsync(login.username, login.password);
+                var authResult = await AuthenticateUserAsync(login.username!, login.password);
                 if (!authResult.IsSuccess)
                 {
                     _logger.LogWarning("Authentication failed for user: {Username}", login.username);
@@ -68,7 +68,7 @@ namespace AirwayAPI.Controllers
                 }
 
                 int userid = await _userService.GetUserIdAsync(usernameTrimmedLower);
-                var token = _tokenService.GenerateJwtToken(login.username);
+                var token = _tokenService.GenerateJwtToken(login.username!);
 
                 // Re-encrypt the password before sending it back to the client
                 login.password = LoginUtils.EncryptPassword(login.password);
