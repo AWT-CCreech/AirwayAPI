@@ -20,7 +20,7 @@ namespace AirwayAPI.Services
             string replaced = DelimiterRegex().Replace(input.Trim(), ",");
 
             // Remove a leading comma if it exists
-            if (replaced.StartsWith(","))
+            if (replaced.StartsWith(','))
             {
                 replaced = replaced[1..];
             }
