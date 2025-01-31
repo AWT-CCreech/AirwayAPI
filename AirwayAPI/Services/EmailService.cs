@@ -21,21 +21,61 @@ namespace AirwayAPI.Services
         {
             _logger.LogInformation("Attempting to send email to {ToEmail}", emailInput.ToEmails);
 
+            // 1) If we have a username, fetch the sender info for placeholders (Name, JobTitle, Phones, etc.)
+            //    We'll only do this if username/password is provided. Otherwise, we skip quietly.
+            if (!string.IsNullOrWhiteSpace(emailInput.UserName) &&
+                !string.IsNullOrWhiteSpace(emailInput.Password))
+            {
+                // Get DB data for the user
+                var (fullName, userEmail, jobTitle, directPhone, mobilePhone) = await GetSenderInfoAsync(emailInput.UserName);
+
+                // Ensure placeholders is not null
+                if (emailInput.Placeholders == null)
+                    emailInput.Placeholders = new Dictionary<string, string>();
+
+                // Fill placeholders if the caller didn't already set them
+                if (!emailInput.Placeholders.ContainsKey("%%NAME%%"))
+                    emailInput.Placeholders["%%NAME%%"] = fullName;
+                if (!emailInput.Placeholders.ContainsKey("%%JOBTITLE%%"))
+                    emailInput.Placeholders["%%JOBTITLE%%"] = jobTitle;
+                if (!emailInput.Placeholders.ContainsKey("%%DIRECT%%"))
+                    emailInput.Placeholders["%%DIRECT%%"] = directPhone;
+                if (!emailInput.Placeholders.ContainsKey("%%MOBILE%%"))
+                    emailInput.Placeholders["%%MOBILE%%"] = mobilePhone;
+
+                // If Body is present, map it to %%EMAILBODY%% so it shows up in the template
+                if (!emailInput.Placeholders.ContainsKey("%%EMAILBODY%%"))
+                    emailInput.Placeholders["%%EMAILBODY%%"] = emailInput.Body ?? string.Empty;
+
+                // If FromEmail is empty, default to the user’s "username@airway.com"
+                if (string.IsNullOrWhiteSpace(emailInput.FromEmail))
+                {
+                    emailInput.FromEmail = $"{emailInput.UserName}@airway.com";
+                }
+            }
+            else
+            {
+                // If the user didn't provide login info, we skip the step of auto-filling placeholders
+                // (You could optionally throw if these are required.)
+                _logger.LogInformation("No username/password provided—skipping auto-populating placeholders with DB user info.");
+            }
+
+            // 2) Load the SMTP config
             var (server, port, useSsl) = GetSmtpConfiguration();
 
-            // Override recipients in development environment
+            // 3) Override recipients in dev environment if needed
             OverrideRecipientForDevelopment(emailInput);
 
+            // 4) Build the MimeMessage with placeholders
             var message = CreateEmailMessage(emailInput);
 
+            // 5) Send the email via SMTP
             using var client = new SmtpClient();
             try
             {
-                // Connect to SMTP server
                 _logger.LogInformation("Connecting to SMTP server: {Server}:{Port}", server, port);
                 await client.ConnectAsync(server, port, useSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
 
-                // Authenticate with SMTP server
                 if (string.IsNullOrWhiteSpace(emailInput.UserName) || string.IsNullOrWhiteSpace(emailInput.Password))
                 {
                     throw new ArgumentNullException("Username and Password must be provided.");
@@ -44,7 +84,6 @@ namespace AirwayAPI.Services
                 _logger.LogInformation("Authenticating SMTP client as {UserName}", emailInput.UserName);
                 await client.AuthenticateAsync($"{emailInput.UserName}@airway.com", LoginUtils.DecryptPassword(emailInput.Password));
 
-                // Send the email
                 _logger.LogInformation("Sending email to {ToEmail}", string.Join(", ", emailInput.ToEmails));
                 await client.SendAsync(message);
 
@@ -64,6 +103,7 @@ namespace AirwayAPI.Services
                 }
             }
         }
+
 
         public async Task<(string FullName, string Email, string JobTitle, string DirectPhone, string MobilePhone)> GetSenderInfoAsync(string username)
         {
