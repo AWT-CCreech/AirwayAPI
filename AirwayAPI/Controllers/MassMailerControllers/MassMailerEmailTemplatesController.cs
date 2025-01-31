@@ -29,7 +29,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 .Where(email => email.EnteredBy != null && email.EnteredBy.Trim().ToLower() == normalizedUser)
                 .ToListAsync();
 
-            if (!templatesForUser.Any())
+            if (templatesForUser.Count == 0)
                 return NotFound();
 
             return templatesForUser;

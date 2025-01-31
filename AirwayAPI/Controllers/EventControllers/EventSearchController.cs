@@ -1,9 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models.EquipmentRequestModels;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace AirwayAPI.Controllers.EventControllers
 {
@@ -23,7 +21,7 @@ namespace AirwayAPI.Controllers.EventControllers
         /// <param name="criteria">Contains search filters like dates, company, and rep ID.</param>
         /// <returns>A list of equipment requests that match the specified criteria, including sales rep username.</returns>
         [HttpGet("EquipmentRequestSearch")]
-        public async Task<IActionResult> EquipmentRequestSearch([FromQuery] EquipmentRequestSearchCriteria criteria)
+        public async Task<IActionResult> EquipmentRequestSearch([FromQuery] EventSearchCriteria criteria)
         {
             try
             {

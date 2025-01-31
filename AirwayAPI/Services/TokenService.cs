@@ -1,21 +1,15 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using AirwayAPI.Services.Interfaces;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
 namespace AirwayAPI.Services
 {
-    public class TokenService
+    public class TokenService(IConfiguration configuration, ILogger<TokenService> logger) : ITokenService
     {
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<TokenService> _logger;
-
-
-        public TokenService(IConfiguration configuration, ILogger<TokenService> logger)
-        {
-            _configuration = configuration;
-            _logger = logger;
-        }
+        private readonly IConfiguration _configuration = configuration;
+        private readonly ILogger<TokenService> _logger = logger;
 
         public string GenerateJwtToken(string username)
         {
@@ -33,8 +27,9 @@ namespace AirwayAPI.Services
 
             var claims = new List<Claim>
             {
-                new(JwtRegisteredClaimNames.Sub, username), // Important: 'sub' claim should be present
+                new(JwtRegisteredClaimNames.Sub, username), // 'sub' claim
                 new(ClaimTypes.NameIdentifier, username),
+                new(ClaimTypes.Email, $"{username}@airway.com"),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -63,7 +58,7 @@ namespace AirwayAPI.Services
                     throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
                 }
 
-                _logger.LogInformation("Using key for validation: {Key}", jwtKey);
+                _logger.LogInformation("Using key for validation.");
 
                 var tokenValidationParameters = new TokenValidationParameters
                 {
@@ -107,7 +102,10 @@ namespace AirwayAPI.Services
                     var identity = new ClaimsIdentity(claims, "Jwt");
 
                     // Add the Name claim manually if not present
-                    identity.AddClaim(new Claim(ClaimTypes.Name, subClaim));
+                    if (!claims.Any(c => c.Type == ClaimTypes.Name))
+                    {
+                        identity.AddClaim(new Claim(ClaimTypes.Name, subClaim));
+                    }
 
                     return new ClaimsPrincipal(identity);
                 }

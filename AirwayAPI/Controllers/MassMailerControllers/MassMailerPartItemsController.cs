@@ -17,7 +17,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
         [HttpGet("{userId}")]
         public async Task<ActionResult<IEnumerable<MassMailerPartItem>>> GetEquipmentRequest(int userId)
         {
-            List<MassMailerPartItem> items = new();
+            List<MassMailerPartItem> items = [];
             /*-----------  Query for showing Today's Marked Mass Mailings  -----------*
              *----------- for that user - THAT HAVE PART NUMBERS (grouped) -----------*/
             string company = "";

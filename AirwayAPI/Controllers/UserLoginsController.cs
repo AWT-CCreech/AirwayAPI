@@ -2,7 +2,7 @@
 using AirwayAPI.Data;
 using AirwayAPI.Models.LoginModels;
 using AirwayAPI.Models.SecurityModels;
-using AirwayAPI.Services;
+using AirwayAPI.Services.Interfaces;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -12,22 +12,17 @@ namespace AirwayAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserLoginsController : ControllerBase
+    public class UserLoginsController(
+        eHelpDeskContext context,
+        ILogger<UserLoginsController> logger,
+        ITokenService tokenService,
+        IUserService userService) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<UserLoginsController> _logger;
-        private readonly TokenService _tokenService; // Inject TokenService
-        private static readonly string[] predefinedUserArray = new[] { "mgibson", "lvonder", "kgildersleeve" };
-
-        public UserLoginsController(
-            eHelpDeskContext context,
-            ILogger<UserLoginsController> logger,
-            TokenService tokenService) // Inject TokenService
-        {
-            _context = context;
-            _logger = logger;
-            _tokenService = tokenService; // Assign TokenService
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<UserLoginsController> _logger = logger;
+        private readonly ITokenService _tokenService = tokenService; // Inject ITokenService
+        private readonly IUserService _userService = userService; // Inject IUserService
+        private static readonly string[] predefinedUserArray = ["mgibson", "lvonder", "kgildersleeve"];
 
         [HttpPost]
         public async Task<ActionResult<LoginInfo>> GetUsers([FromBody] LoginInfo login)
@@ -65,15 +60,15 @@ namespace AirwayAPI.Controllers
                     }
                 }
 
-                var authResult = await AuthenticateUserAsync(login.username, login.password);
+                var authResult = await AuthenticateUserAsync(login.username!, login.password);
                 if (!authResult.IsSuccess)
                 {
                     _logger.LogWarning("Authentication failed for user: {Username}", login.username);
                     return StatusCode(401, new { message = "Authentication failed." });
                 }
 
-                int userid = await GetUserIdAsync(usernameTrimmedLower);
-                var token = _tokenService.GenerateJwtToken(login.username);
+                int userid = await _userService.GetUserIdAsync(usernameTrimmedLower);
+                var token = _tokenService.GenerateJwtToken(login.username!);
 
                 // Re-encrypt the password before sending it back to the client
                 login.password = LoginUtils.EncryptPassword(login.password);
@@ -108,20 +103,6 @@ namespace AirwayAPI.Controllers
                 _logger.LogError(ex, "Failed to authenticate user: {Username}", username);
                 return AuthenticationResult.Failure();
             }
-        }
-
-        private async Task<int> GetUserIdAsync(string username)
-        {
-            return username switch
-            {
-                "mgibson" => 125,
-                "lvonder" => 65,
-                "kgildersleeve" => 229,
-                _ => await _context.Users
-                                   .Where(u => (u.Uname ?? string.Empty).Trim().ToLower() == username)
-                                   .Select(u => u.Id)
-                                   .FirstOrDefaultAsync()
-            };
         }
 
         private static bool IsPredefinedUser(string username) => predefinedUserArray.Contains(username);
