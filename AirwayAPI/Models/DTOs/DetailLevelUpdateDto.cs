@@ -1,6 +1,6 @@
 ﻿namespace AirwayAPI.Models.DTOs
 {
-    public class EquipmentRequestUpdateDto
+    public class DetailLevelUpdateDto
     {
         public int EventId { get; set; }
         public int RequestId { get; set; }
