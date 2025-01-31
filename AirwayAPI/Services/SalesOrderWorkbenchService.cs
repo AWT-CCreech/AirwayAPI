@@ -3,10 +3,7 @@ using AirwayAPI.Models;
 using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Services.Interfaces;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace AirwayAPI.Services
 {
@@ -16,7 +13,7 @@ namespace AirwayAPI.Services
         IEmailService emailService,
         IUserService userService,
         IStringService stringService
-        ) : ISalesOrderWorkbenchService
+    ) : ISalesOrderWorkbenchService
     {
         private readonly eHelpDeskContext _context = context;
         private readonly ILogger<SalesOrderWorkbenchService> _logger = logger;
@@ -24,20 +21,14 @@ namespace AirwayAPI.Services
         private readonly IUserService _userService = userService;
         private readonly IStringService _stringService = stringService;
 
-        #region 1) GET methods (Event-Level & Detail-Level)
+        #region 1) GET: (Event-Level & Detail-Level)
 
-        /// <summary>
-        /// Get the event-level data based on the given filters
-        /// </summary>
-        /// <param name="salesRepId"></param>
-        /// <param name="billToCompany"></param>
-        /// <param name="eventId"></param>
-        /// <returns></returns>
         public async Task<List<object>> GetEventLevelDataAsync(int? salesRepId, string? billToCompany, int? eventId)
         {
+            // Matches "RWSalesOrderNum = '0' And Draft=0" from old ASP
             var query = from so in _context.QtSalesOrders
                         join u in _context.Users on so.AccountMgr equals u.Id into userJoin
-                        from u in userJoin.DefaultIfEmpty()
+                        from usr in userJoin.DefaultIfEmpty()
                         where so.RwsalesOrderNum == "0" && so.Draft == false
                         select new
                         {
@@ -49,11 +40,11 @@ namespace AirwayAPI.Services
                             so.SaleTotal,
                             so.SaleDate,
                             so.AccountMgr,
-                            SalesRep = u != null ? u.Uname : "N/A",
+                            SalesRep = usr != null ? usr.Uname : "N/A",
                             so.DropShipment
                         };
 
-            // Filter conditions
+            // Apply filters
             if (eventId.HasValue && eventId.Value != 0)
                 query = query.Where(q => q.EventId == eventId.Value);
             if (salesRepId.HasValue && salesRepId.Value != 0)
@@ -68,20 +59,17 @@ namespace AirwayAPI.Services
             return result;
         }
 
-        /// <summary>
-        /// Get the detail-level data based on the given filters
-        /// </summary>
-        /// <param name="salesRepId"></param>
-        /// <param name="billToCompany"></param>
-        /// <param name="eventId"></param>
-        /// <returns></returns>
         public async Task<List<object>> GetDetailLevelDataAsync(int? salesRepId, string? billToCompany, int? eventId)
         {
+            // Matches the old ASP "SELECT d.* from qtSalesOrderDetail d
+            //  INNER JOIN qtSalesOrders so ON d.SaleId=so.SaleId
+            //  WHERE d.SOFlag=1 AND so.RWSalesOrderNum='0'..."
+            // But you can adjust if you want RWSalesOrderNum=some value.
             var query = from d in _context.QtSalesOrderDetails
                         join so in _context.QtSalesOrders on d.SaleId equals so.SaleId
                         join er in _context.EquipmentRequests on d.RequestId equals er.RequestId
                         join u in _context.Users on so.AccountMgr equals u.Id into userJoin
-                        from u in userJoin.DefaultIfEmpty()
+                        from usr in userJoin.DefaultIfEmpty()
                         where d.Soflag == true
                         select new
                         {
@@ -98,11 +86,11 @@ namespace AirwayAPI.Services
                             so.EventId,
                             so.BillToCompanyName,
                             so.AccountMgr,
-                            SalesRep = u != null ? u.Uname : "N/A",
+                            SalesRep = usr != null ? usr.Uname : "N/A",
                             er.DropShipment
                         };
 
-            // Filter conditions
+            // Filters
             if (eventId.HasValue && eventId.Value != 0)
                 query = query.Where(q => q.EventId == eventId.Value);
             if (salesRepId.HasValue && salesRepId.Value != 0)
@@ -116,39 +104,36 @@ namespace AirwayAPI.Services
             var result = await query.OrderBy(q => q.RequestId).ToListAsync<object>();
             return result;
         }
-
         #endregion
 
-        #region 2) POST methods (UpdateEventLevel & UpdateDetailLevel)
+        #region 2) POST: (UpdateEventLevel & UpdateDetailLevel)
 
         /// <summary>
-        /// Update the SalesOrder record and related entities at the event level
+        /// Update the SalesOrder record and related entities at the event level,
+        /// replicating the old ASP logic (Verizon vs Non-Verizon, dropping shipments, etc.).
         /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        public async Task UpdateEventLevelAsync(SalesOrderUpdateDto request)
+        public async Task UpdateEventLevelAsync(EventLevelUpdateDto request)
         {
-            // Start a transaction so that all changes either commit or roll back together
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1) Update the QtSalesOrders record
+                // 1) Load the QtSalesOrder
                 var salesOrder = await _context.QtSalesOrders
                     .FirstOrDefaultAsync(so => so.SaleId == request.SaleId)
                     ?? throw new Exception($"Sales order with SaleID#{request.SaleId} not found.");
 
-                // For instance, updating RwsalesOrderNum with "ReplaceDelimiters"
+                // 2) Overwrite RwsalesOrderNum, DropShipment
+                //    Replace semicolons if user typed multiple SO #s.
                 salesOrder.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
                 salesOrder.DropShipment = request.DropShipment;
                 salesOrder.EditDate = DateTime.Now;
-
                 _context.QtSalesOrders.Update(salesOrder);
                 await _context.SaveChangesAsync();
 
-                // 2) Update the related quote
+                // 3) Update the related quote, if any
                 await UpdateQuoteAsync(request);
 
-                // 3) Update the detail-level items & associated EquipmentRequests
+                // 4) Update all detail-level items for this SaleID => set the EquipmentRequest as “Sold,” etc.
                 var details = await _context.QtSalesOrderDetails
                     .Where(d => d.SaleId == request.SaleId && d.QtySold > 0)
                     .ToListAsync();
@@ -158,8 +143,14 @@ namespace AirwayAPI.Services
                     await ProcessEquipmentRequest(detail, request);
                 }
 
-                // 4) (Optional) Send email notifications about the sales order change
-                await NotifyEventLevelChanges(request, salesOrder);
+                // 5) Mark any other items for the Event as LOST if QtySold=0
+                if (!salesOrder.EventId.HasValue)
+                    throw new Exception("SalesOrder is missing an EventId");
+
+                await MarkUnsoldItemsAsLostAsync(salesOrder.EventId.Value);
+
+                // 6) Fire off the advanced emailing logic (Verizon vs Non-Verizon, drop ship prepay, etc.)
+                await SendEventLevelEmailsAsync(request, salesOrder);
 
                 await transaction.CommitAsync();
             }
@@ -172,93 +163,78 @@ namespace AirwayAPI.Services
         }
 
         /// <summary>
-        /// Update the EquipmentRequest record and related entities at the detail level
+        /// Update the detail-level record and its EquipmentRequest, replicating old logic.
         /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        public async Task UpdateDetailLevelAsync(EquipmentRequestUpdateDto request)
+        public async Task UpdateDetailLevelAsync(DetailLevelUpdateDto request)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1a) Retrieve NEW EventID based on `request.SalesOrderNum`
-                var query = _context.EquipmentRequests
-                    .Where(er => er.SalesOrderNum == request.SalesOrderNum)
-                    .Select(er => er.EventId);
+                // 1) Retrieve the SalesOrderDetail record
+                var detail = await _context.QtSalesOrderDetails
+                    .FirstOrDefaultAsync(d => d.RequestId == request.RequestId)
+                    ?? throw new Exception($"SalesOrderDetail not found for RequestID={request.RequestId}.");
 
-                // 1b) Get the raw SQL for logging/debugging
-                var rawSql = query.ToQueryString();
-                _logger.LogDebug("SQL Query for retrieving EventID: {rawSql}", rawSql);
-
-                // 1c) Execute the query and retrieve the result
-                var checkEventID = await query.FirstOrDefaultAsync()
-                    ?? throw new Exception($"EventID not found for SalesOrderNum {request.SalesOrderNum}");
-
-                _logger.LogDebug("EventID found for SalesOrderNum {0}: {1}", request.SalesOrderNum, checkEventID);
-
-                // 2a) Retrieve the QtSalesOrderDetail record based on `request.RequestId`
-                var salesOrderDetail = await _context.QtSalesOrderDetails
-                    .FirstOrDefaultAsync(so => so.RequestId == request.RequestId)
-                    ?? throw new Exception($"Sales Order Detail with RequestID#{request.RequestId} not found.");
-
-                // 2b) [Optional To-Do] Update the Soflag to improve UX by avoiding reliance on overnight scripts
-                // salesOrderDetail.Soflag = false;
-                // _context.QtSalesOrderDetails.Update(salesOrderDetail);
-                // await _context.SaveChangesAsync();
-
-                // 2c) Retrieve the QtSalesOrder record and ensure the EventID is updated
+                // 2) Retrieve the parent QtSalesOrder
                 var salesOrder = await _context.QtSalesOrders
-                    .FirstOrDefaultAsync(so => so.SaleId == salesOrderDetail.SaleId)
-                    ?? throw new Exception($"Sales Order with SaleID#{salesOrderDetail.SaleId} not found");
+                    .FirstOrDefaultAsync(so => so.SaleId == detail.SaleId)
+                    ?? throw new Exception($"SalesOrder not found for SaleID={detail.SaleId}.");
 
-                if (salesOrder.EventId != checkEventID)
-                    salesOrder.EventId = checkEventID;
-
-                // 2d) Update the RwsalesOrderNum and EditDate fields
+                // Overwrite RwsalesOrderNum from user input (like RWSalesNum2 in classic ASP)
                 salesOrder.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
                 salesOrder.EditDate = DateTime.Now;
-
-                // 2e) Save the updated QtSalesOrder
                 _context.QtSalesOrders.Update(salesOrder);
                 await _context.SaveChangesAsync();
 
-                // 3a) Retrieve the QtQuote record associated with the SalesOrder's EventID
+                // 3) Update the Quote record if needed
                 var quote = await _context.QtQuotes
-                    .Where(qt => qt.RwsalesOrderNum.Length > 0
-                                 && qt.Approved == true
-                                 && qt.EventId == salesOrder.EventId)
-                    .FirstOrDefaultAsync()
-                    ?? throw new Exception($"Quote with EventID#{salesOrder.EventId} not found");
+                    .FirstOrDefaultAsync(q => q.EventId == salesOrder.EventId && q.QuoteId == salesOrder.QuoteId);
+                if (quote != null)
+                {
+                    quote.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
+                    await _context.SaveChangesAsync();
+                }
 
-                // 3b) Update the EventID and RwsalesOrderNum fields in the quote
-                if (quote.EventId != checkEventID)
-                    quote.EventId = checkEventID;
-                quote.RwsalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
+                // 4) Update the EquipmentRequest record itself
+                var equipmentRequest = await _context.EquipmentRequests
+                    .FirstOrDefaultAsync(er => er.RequestId == request.RequestId)
+                    ?? throw new Exception($"EquipmentRequest not found for RequestID={request.RequestId}.");
 
-                // 3c) Save the updated QtQuote record
-                _context.QtQuotes.Update(quote);
+                // Overwrite or append the new MAS # 
+                equipmentRequest.SalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
+
+                // Mark as Sold
+                equipmentRequest.Status = "Sold";
+                equipmentRequest.MarkedSoldDate = DateTime.Now;
+
+                // e.g. old ASP style: xQtySold = existing.QtySold + detail.QtySold
+                equipmentRequest.QtySold = (equipmentRequest.QtySold ?? 0) + (detail.QtySold ?? 0);
+
+                // Decide if we can mark as Bought
+                bool canMarkAsBought = await ShouldMarkAsBoughtAsync(equipmentRequest, detail.QtySold ?? 0);
+                equipmentRequest.Bought = canMarkAsBought;
+
+                if (canMarkAsBought)
+                {
+                    _context.TrkSoldItemHistories.Add(new TrkSoldItemHistory
+                    {
+                        RequestId = equipmentRequest.RequestId,
+                        Username = request.Username,
+                        PageName = "UpdateDetailLevelAsync",
+                        DateMarkedBought = DateTime.Now
+                    });
+                }
+
+                equipmentRequest.ModifiedBy = await _userService.GetUserIdAsync(request.Username);
+                equipmentRequest.ModifiedDate = DateTime.Now;
+
+                _context.EquipmentRequests.Update(equipmentRequest);
                 await _context.SaveChangesAsync();
 
-                // 4a) Retrieve the EquipmentRequest record based on `request.RequestId`
-                var detail = await _context.EquipmentRequests
-                    .FirstOrDefaultAsync(d => d.RequestId == request.RequestId)
-                    ?? throw new Exception($"EquipmentRequest with RequestId #{request.RequestId} not found.");
+                // 5) Optionally send email to replicate old detail-level email logic 
+                //    (but in your classic code, detail-level was almost the same as event-level).
+                await NotifyDetailLevelChanges(request, equipmentRequest);
 
-                // 4b) Update the EventID, SalesOrderNum, ModifiedBy, and ModifiedDate fields
-                if (detail.EventId != checkEventID)
-                    detail.EventId = checkEventID;
-                detail.SalesOrderNum = _stringService.ReplaceDelimiters(request.SalesOrderNum);
-                detail.ModifiedBy = await _userService.GetUserIdAsync(request.Username);
-                detail.ModifiedDate = DateTime.Now;
-
-                // 4c) Save the updated EquipmentRequest record
-                _context.EquipmentRequests.Update(detail);
-                await _context.SaveChangesAsync();
-
-                // 5a) Notify relevant stakeholders via email about the EquipmentRequest changes
-                await NotifyDetailLevelChanges(request, detail);
-
-                // 5b) Commit the transaction to ensure all updates are saved atomically
                 await transaction.CommitAsync();
             }
             catch (Exception ex)
@@ -271,68 +247,76 @@ namespace AirwayAPI.Services
 
         #endregion
 
-        #region 3) Internal Helper Methods (merged from existing services)
+        #region 3) Internal Helper Methods (Email, Mark Lost, Bought, etc.)
 
         /// <summary>
-        /// Process the EquipmentRequest and update the related entities
+        /// Process each EquipmentRequest for the event-level update:
+        ///   - Overwrite/append the SalesOrderNum
+        ///   - Mark Sold, record quantity, handle "Bought"
+        ///   - Write to history
         /// </summary>
-        /// <param name="detail"></param>
-        /// <param name="request"></param>
-        /// <returns></returns>
-        /// <exception cref="Exception"></exception>
-        private async Task ProcessEquipmentRequest(QtSalesOrderDetail detail, SalesOrderUpdateDto request)
+        private async Task ProcessEquipmentRequest(QtSalesOrderDetail detail, EventLevelUpdateDto request)
         {
-            _logger.LogInformation(
-                "Processing EquipmentRequest for RequestId {RequestId} with DropShipment: {DropShipment}",
-                detail.RequestId, request.DropShipment
-            );
-
-            var equipmentRequest = await _context.EquipmentRequests
+            var eqReq = await _context.EquipmentRequests
                 .FirstOrDefaultAsync(r => r.RequestId == detail.RequestId)
-                ?? throw new Exception($"EquipmentRequest with RequestID {detail.RequestId} not found.");
+                ?? throw new Exception($"EquipmentRequest with RequestID={detail.RequestId} not found.");
 
-            // Overwrite or append the SalesOrderNum as needed
-            equipmentRequest.SalesOrderNum = UpdateSalesOrderNum(equipmentRequest.SalesOrderNum ?? "", request.SalesOrderNum);
-            equipmentRequest.Status = "Sold";
-            equipmentRequest.SalePrice = detail.UnitPrice;
-            equipmentRequest.MarkedSoldDate = DateTime.Now;
-            equipmentRequest.QtySold = (equipmentRequest.QtySold ?? 0) + (detail.QtySold ?? 0);
-            equipmentRequest.DropShipment = request.DropShipment;
-            equipmentRequest.ModifiedBy = await _userService.GetUserIdAsync(request.Username);
-            equipmentRequest.ModifiedDate = DateTime.Now;
+            // Overwrite or append the new MAS # if needed
+            eqReq.SalesOrderNum = UpdateSalesOrderNum(eqReq.SalesOrderNum ?? "", request.SalesOrderNum);
 
-            // Enough stock to mark as Bought?
-            bool canMarkAsBought = await ShouldMarkAsBoughtAsync(equipmentRequest, detail.QtySold ?? 0);
-            _logger.LogInformation("EquipmentRequest {RequestId} can be marked as Bought: {canMarkAsBought}", detail.RequestId, canMarkAsBought);
+            eqReq.Status = "Sold";
+            eqReq.SalePrice = detail.UnitPrice;
+            eqReq.MarkedSoldDate = DateTime.Now;
+
+            eqReq.QtySold = (eqReq.QtySold ?? 0) + (detail.QtySold ?? 0);
+            eqReq.DropShipment = request.DropShipment;
+            eqReq.ModifiedBy = await _userService.GetUserIdAsync(request.Username);
+            eqReq.ModifiedDate = DateTime.Now;
+
+            bool canMarkAsBought = await ShouldMarkAsBoughtAsync(eqReq, detail.QtySold ?? 0);
+            eqReq.Bought = canMarkAsBought;
             if (canMarkAsBought)
             {
-                equipmentRequest.Bought = true;
                 _context.TrkSoldItemHistories.Add(new TrkSoldItemHistory
                 {
-                    RequestId = equipmentRequest.RequestId,
-                    DateMarkedBought = DateTime.Now,
+                    RequestId = eqReq.RequestId,
                     Username = request.Username,
-                    PageName = "SalesOrderWorkbenchService.ProcessEquipmentRequest"
+                    PageName = "SalesOrderWorkbenchService.ProcessEquipmentRequest",
+                    DateMarkedBought = DateTime.Now
                 });
             }
-            else
-            {
-                equipmentRequest.Bought = false;
-            }
 
-            _context.EquipmentRequests.Update(equipmentRequest);
+            _context.EquipmentRequests.Update(eqReq);
             await _context.SaveChangesAsync();
         }
 
         /// <summary>
-        /// Check if the EquipmentRequest should be marked as Bought
+        /// Mark unsold items as LOST => "UPDATE EquipmentRequest SET Status='Lost' WHERE QtySold=0 AND EventID=..."
         /// </summary>
-        /// <param name="request"></param>
-        /// <param name="qtySold"></param>
-        /// <returns></returns>
-        private async Task<bool> ShouldMarkAsBoughtAsync(EquipmentRequest request, int qtySold)
+        private async Task MarkUnsoldItemsAsLostAsync(int eventId)
         {
-            // This basically replicates “NeedToBuy <= 0 => Bought=1, else => Bought=0”
+            var items = await _context.EquipmentRequests
+                .Where(er => er.EventId == eventId && (er.QtySold ?? 0) == 0)
+                .ToListAsync();
+
+            foreach (var item in items)
+                item.Status = "Lost";
+
+            if (items.Count != 0)
+            {
+                _context.EquipmentRequests.UpdateRange(items);
+                await _context.SaveChangesAsync();
+            }
+
+            _logger.LogInformation("Marked {Count} items as LOST for EventID={EventId}", items.Count, eventId);
+        }
+
+        /// <summary>
+        /// Decide if we can mark the item as Bought => replicate the "NeedToBuy <= 0" from ASP
+        /// </summary>
+        private async Task<bool> ShouldMarkAsBoughtAsync(EquipmentRequest request, int qtySoldThisLine)
+        {
+            // 1) Retrieve the relevant inventory data
             var inventory = await _context.TrkRwImItems
                 .FirstOrDefaultAsync(i => i.ItemNum == request.PartNum || i.AltPartNum == request.PartNum);
 
@@ -348,127 +332,205 @@ namespace AirwayAPI.Services
                 .SumAsync(r => r.QtyBought) ?? 0;
 
             int QtySoldToday = await _context.EquipmentRequests
-                .Where(e => e.PartNum == request.PartNum &&
-                            e.Status == "Sold" &&
-                            e.MarkedSoldDate.HasValue &&
-                            e.MarkedSoldDate.Value.Date == DateTime.Today)
+                .Where(e => e.PartNum == request.PartNum
+                            && e.Status == "Sold"
+                            && e.MarkedSoldDate.HasValue
+                            && e.MarkedSoldDate.Value.Date == DateTime.Today)
                 .SumAsync(e => e.QtySold) ?? 0;
 
+            // 2) Calculate how much is actually available to sell
             int QtyAvailToSell = QtyOnHand + Adjustments - QtyInPick - QtySoldToday;
 
-            _logger.LogInformation("QtyOnHand: {0}, QtyInPick: {1}, Adjustments: {2}, QtyBought: {3}, QtySoldToday: {4}, QtyAvailToSell: {5}",
-                QtyOnHand, QtyInPick, Adjustments, QtyBought, QtySoldToday, QtyAvailToSell);
+            // 3) Compare: If (qtySoldThisLine - QtyAvailToSell - QtyBought) <= 0 => mark as Bought
+            int difference = qtySoldThisLine - QtyAvailToSell - QtyBought;
+            bool canMarkAsBought = difference <= 0;
 
-            // if (qtySold - QtyAvailToSell - QtyBought) <= 0 => can mark as bought
-            return (qtySold - QtyAvailToSell - QtyBought) <= 0;
-        }
-
-        /// <summary>
-        /// Update the related quote record
-        /// </summary>
-        /// <param name="salesOrderUpdate"></param>
-        /// <returns></returns>
-        private async Task UpdateQuoteAsync(SalesOrderUpdateDto salesOrderUpdate)
-        {
-            var relatedQuote = await _context.QtQuotes
-                .FirstOrDefaultAsync(q => q.QuoteId == salesOrderUpdate.QuoteId &&
-                                          q.EventId == salesOrderUpdate.EventId);
-
-            if (relatedQuote == null)
+            // 4) Log the breakdown either way
+            if (canMarkAsBought)
             {
-                _logger.LogWarning("No related quote found for QuoteID {QuoteId} and EventID {EventId}",
-                    salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
-                return;
+                _logger.LogInformation(
+                    "ShouldMarkAsBoughtAsync => RequestID {RequestId} IS marked as Bought. " +
+                    "QtySoldLine={QtySoldThisLine}, QtyOnHand={QtyOnHand}, QtyInPick={QtyInPick}, " +
+                    "Adjustments={Adjustments}, QtySoldToday={QtySoldToday}, QtyBought={QtyBought}, " +
+                    "QtyAvailToSell={QtyAvailToSell}, difference={Difference}",
+                    request.RequestId, qtySoldThisLine, QtyOnHand, QtyInPick, Adjustments,
+                    QtySoldToday, QtyBought, QtyAvailToSell, difference
+                );
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "ShouldMarkAsBoughtAsync => RequestID {RequestId} NOT marked as Bought. " +
+                    "Insufficient inventory or purchased qty to cover sold quantity. " +
+                    "QtySoldLine={QtySoldThisLine}, QtyOnHand={QtyOnHand}, QtyInPick={QtyInPick}, " +
+                    "Adjustments={Adjustments}, QtySoldToday={QtySoldToday}, QtyBought={QtyBought}, " +
+                    "QtyAvailToSell={QtyAvailToSell}, difference={Difference}",
+                    request.RequestId, qtySoldThisLine, QtyOnHand, QtyInPick, Adjustments,
+                    QtySoldToday, QtyBought, QtyAvailToSell, difference
+                );
             }
 
-            // Example: replace semicolons in SalesOrderNum
-            relatedQuote.RwsalesOrderNum = salesOrderUpdate.SalesOrderNum.Replace(";", ",");
-
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Successfully updated related quote for QuoteID {QuoteId} & EventID {EventId}",
-                salesOrderUpdate.QuoteId, salesOrderUpdate.EventId);
+            return canMarkAsBought;
         }
 
         /// <summary>
-        /// Notify the sales order changes via email
+        /// Overwrite or append new SalesOrderNum. 
+        /// In old ASP, if existing was non-empty, they'd sometimes do "existing, new".
+        /// Just adjust as needed.
         /// </summary>
-        /// <param name="request"></param>
-        /// <param name="salesOrder"></param>
-        /// <returns></returns>
-        private async Task NotifyEventLevelChanges(SalesOrderUpdateDto request, QtSalesOrder salesOrder)
-        {
-            var (FullName, Email, JobTitle, DirectPhone, MobilePhone) = await _emailService.GetSenderInfoAsync(request.Username);
-            var placeholders = new Dictionary<string, string>
-            {
-                { "%%EMAILBODY%%", $"SO#{salesOrder.RwsalesOrderNum} has been updated." },
-                { "%%NAME%%", FullName },
-                { "%%EMAIL%%", Email },
-                { "%%JOBTITLE%%", JobTitle },
-                { "%%DIRECT%%", DirectPhone },
-                { "%%MOBILE%%", MobilePhone }
-            };
-
-            var emailInput = new EmailInputBase
-            {
-                FromEmail = Email,
-                ToEmails = new List<string> { "ccreech@airway.com" },
-                Subject = $"Sales Order {salesOrder.RwsalesOrderNum} Updated",
-                Body = "%%EMAILBODY%%",
-                Placeholders = placeholders,
-                UserName = request.Username,
-                Password = request.Password
-            };
-
-            await _emailService.SendEmailAsync(emailInput);
-        }
-
-        /// <summary>
-        /// Notify the equipment request changes via email
-        /// </summary>
-        /// <param name="request"></param>
-        /// <param name="equipmentRequest"></param>
-        /// <returns></returns>
-        private async Task NotifyDetailLevelChanges(EquipmentRequestUpdateDto request, EquipmentRequest equipmentRequest)
-        {
-            var senderInfo = await _emailService.GetSenderInfoAsync(request.Username);
-            var placeholders = new Dictionary<string, string>
-            {
-                { "%%EMAILBODY%%", $"SO#{equipmentRequest.SalesOrderNum} has been updated." },
-                { "%%NAME%%", senderInfo.FullName },
-                { "%%EMAIL%%", senderInfo.Email },
-                { "%%JOBTITLE%%", senderInfo.JobTitle },
-                { "%%DIRECT%%", senderInfo.DirectPhone },
-                { "%%MOBILE%%", senderInfo.MobilePhone }
-            };
-
-            var emailInput = new EmailInputBase
-            {
-                FromEmail = senderInfo.Email,
-                ToEmails = new List<string> { "ccreech@airway.com" },
-                Subject = $"Sales Order {equipmentRequest.SalesOrderNum} Updated",
-                Body = "%%EMAILBODY%%",
-                Placeholders = placeholders,
-                UserName = request.Username,
-                Password = request.Password
-            };
-
-            await _emailService.SendEmailAsync(emailInput);
-        }
-
-        /// <summary>
-        /// Update the SalesOrderNum field based on the existing and new values.
-        /// Can be reformatted for logging or other purposes.
-        /// </summary>
-        /// <param name="existing"></param>
-        /// <param name="newNum"></param>
-        /// <returns></returns>
         private static string UpdateSalesOrderNum(string existing, string newNum)
         {
-            // To simply overwrite, just return newNum.
-            // To append, you can do something like:
-            //  return string.IsNullOrWhiteSpace(existing) ? newNum : $"{existing},{newNum}";
-            return newNum;
+            // For pure overwrite: return newNum;
+            // For append with commas:
+            if (string.IsNullOrWhiteSpace(existing))
+                return newNum;
+            else
+                return existing + ", " + newNum;
         }
+
+        /// <summary>
+        /// Update the QtQuote for the matching quote, setting RwsalesOrderNum
+        /// </summary>
+        private async Task UpdateQuoteAsync(EventLevelUpdateDto dto)
+        {
+            var quote = await _context.QtQuotes
+                .FirstOrDefaultAsync(q => q.QuoteId == dto.QuoteId && q.EventId == dto.EventId);
+
+            if (quote != null)
+            {
+                quote.RwsalesOrderNum = dto.SalesOrderNum.Replace(";", ",");
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                _logger.LogWarning("No related quote found for QuoteID={QuoteId}, EventID={EventId}",
+                    dto.QuoteId, dto.EventId);
+            }
+        }
+
+        /// <summary>
+        /// Send event-level emails replicating the old code:
+        ///   - If BillTo=VERIZON => "A Verizon SO assigned..."
+        ///   - Else check SO_Email_Notifications => "A <billto> SO assigned..."
+        ///   - If soTerms="0" & drop=1 & PONum!="1234" => "PREPAYMENT ALERT" to multiple recipients
+        /// </summary>
+        private async Task SendEventLevelEmailsAsync(EventLevelUpdateDto request, QtSalesOrder salesOrder)
+        {
+            // 1) Check if BillTo starts with "VERIZON"
+            if (salesOrder.BillToCompanyName != null &&
+                salesOrder.BillToCompanyName.StartsWith("VERIZON", StringComparison.OrdinalIgnoreCase))
+            {
+                await _emailService.SendEmailAsync(new EmailInputBase
+                {
+                    //FromEmail = "ITDept@airway.com",
+
+                    FromEmail = "ccreech@airway.com",
+                    ToEmails = new List<string> { "ccreech@airway.com" },
+                    Subject = $"A Verizon SO has been assigned to Event ID {salesOrder.EventId}",
+                    Body = $"SO Number(s): {salesOrder.RwsalesOrderNum}",
+                    UserName = request.Username,
+                    Password = request.Password
+                });
+            }
+            else
+            {
+                // 2) Non-Verizon => check if BillTo in SO_Email_Notifications
+                bool inSoEmailNotify = await _context.SoEmailNotifications
+                    .AnyAsync(n => n.BillToCompanyName == salesOrder.BillToCompanyName);
+
+                if (inSoEmailNotify)
+                {
+                    await _emailService.SendEmailAsync(new EmailInputBase
+                    {
+                        //FromEmail = "ITDept@airway.com",
+
+                        FromEmail = "ccreech@airway.com",
+                        ToEmails = new List<string> { "ccreech@airway.com" },
+                        Subject = $"A {salesOrder.BillToCompanyName} SO has been assigned to Event ID {salesOrder.EventId}",
+                        Body = $"SO Number(s): {salesOrder.RwsalesOrderNum}",
+                        UserName = request.Username,
+                        Password = request.Password
+                    });
+                }
+
+                // 3) Check if soTerms=0, DropShipment=1, PONum!="1234"
+                //    => "PREPAYMENT ALERT" email
+                // In old code, we joined RequestPOs or looked up s.Terms, p.PONum, etc.
+                var soExtra = await (from s in _context.QtSalesOrders
+                                     join e in _context.EquipmentRequests on s.EventId equals e.EventId
+                                     join r in _context.RequestPos on e.RequestId equals r.RequestId into j
+                                     from p in j.DefaultIfEmpty()
+                                     where s.SaleId == salesOrder.SaleId
+                                     select new
+                                     {
+                                         s.Terms,
+                                         PONum = p.Ponum,
+                                         PORep = p.PurchasedBy
+                                     })
+                                     .FirstOrDefaultAsync();
+
+                if (soExtra != null)
+                {
+                    string? soTerms = soExtra.Terms;
+                    string? poNum = soExtra.PONum ?? "";
+                    bool isDrop = salesOrder.DropShipment == true;
+                    bool isPrepayTerm = (soTerms == "0");
+                    bool notFakePO = (poNum != "1234");
+
+                    if (isDrop && isPrepayTerm && notFakePO)
+                    {
+                        // The old code references dsSalesRepEmail, dsPurchEmail, "Acct_dept@airway.com", plus ccCreech
+                        string dsSalesRepEmail = $"{request.Username}@airway.com";
+                        string dsPurchEmail = "Purch_Dept@airway.com"; // or look up p.PORep?
+
+                        // Send "PREPAYMENT ALERT" 
+                        await _emailService.SendEmailAsync(new EmailInputBase
+                        {
+                            //FromEmail = "ITDept@airway.com",
+
+                            FromEmail = "ccreech@airway.com",
+                            ToEmails = new List<string> {
+                                "ccreech@airway.com",
+                                dsSalesRepEmail,
+                                dsPurchEmail,
+                                "Acct_dept@airway.com"
+                            },
+                            Subject = $"PREPAYMENT ALERT FOR SO {salesOrder.RwsalesOrderNum}",
+                            Body = $@"
+                                SO Number: {salesOrder.RwsalesOrderNum} has been flagged as a drop shipment. 
+                                This is a reminder to collect the prepayment before the item(s) ship.
+                                Sales Rep: {request.Username}
+                                PO Number: {poNum}
+                                (etc.)
+                            ",
+                            UserName = request.Username,
+                            Password = request.Password
+                        });
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Optional: If your detail-level updates also require unique emails,
+        /// you can replicate the same Verizon / Non-Verizon logic, or skip if unneeded.
+        /// </summary>
+        private async Task NotifyDetailLevelChanges(DetailLevelUpdateDto request, EquipmentRequest eqReq)
+        {
+            // Basic example: Just send a success email, or replicate advanced logic if needed
+            await _emailService.SendEmailAsync(new EmailInputBase
+            {
+                //FromEmail = "ITDept@airway.com",
+
+                FromEmail = "ccreech@airway.com",
+                ToEmails = new List<string> { "ccreech@airway.com" },
+                Subject = $"Detail-level updated for RequestID={eqReq.RequestId}",
+                Body = $"SO Number(s): {eqReq.SalesOrderNum}",
+                UserName = request.Username,
+                Password = request.Password
+            });
+        }
+
         #endregion
     }
 }
