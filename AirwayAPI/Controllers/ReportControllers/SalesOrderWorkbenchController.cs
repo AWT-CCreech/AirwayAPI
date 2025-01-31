@@ -8,21 +8,24 @@ namespace AirwayAPI.Controllers.ReportControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderWorkbenchController(
-        ISalesOrderWorkbenchService workbenchService,
-        ILogger<SalesOrderWorkbenchController> logger) : ControllerBase
+    public class SalesOrderWorkbenchController : ControllerBase
     {
-        private readonly ISalesOrderWorkbenchService _workbenchService = workbenchService;
-        private readonly ILogger<SalesOrderWorkbenchController> _logger = logger;
+        private readonly ISalesOrderWorkbenchService _workbenchService;
+        private readonly ILogger<SalesOrderWorkbenchController> _logger;
 
-        #region 1) GET methods (Event-Level & Detail-Level)
+        public SalesOrderWorkbenchController(
+            ISalesOrderWorkbenchService workbenchService,
+            ILogger<SalesOrderWorkbenchController> logger)
+        {
+            _workbenchService = workbenchService;
+            _logger = logger;
+        }
+
+        #region 1) GET endpoints (Event-Level & Detail-Level)
+
         /// <summary>
-        /// Get the event-level data for a given sales order.
+        /// Retrieves the Event-level data (no MAS # yet).
         /// </summary>
-        /// <param name="salesRepId"></param>
-        /// <param name="billToCompany"></param>
-        /// <param name="eventId"></param>
-        /// <returns></returns>
         [HttpGet("EventLevelData")]
         public async Task<IActionResult> GetEventLevelData(
             [FromQuery] int? salesRepId,
@@ -42,12 +45,8 @@ namespace AirwayAPI.Controllers.ReportControllers
         }
 
         /// <summary>
-        /// Get the detail-level data for a given sales order.
+        /// Retrieves the Detail-level data (SOFlag=1, no MAS # yet).
         /// </summary>
-        /// <param name="salesRepId"></param>
-        /// <param name="billToCompany"></param>
-        /// <param name="eventId"></param>
-        /// <returns></returns>
         [HttpGet("DetailLevelData")]
         public async Task<IActionResult> GetDetailLevelData(
             [FromQuery] int? salesRepId,
@@ -67,14 +66,14 @@ namespace AirwayAPI.Controllers.ReportControllers
         }
         #endregion
 
-        #region 2) POST methods (UpdateEventLevel & UpdateDetailLevel)
+        #region 2) POST endpoints (UpdateEventLevel & UpdateDetailLevel)
+
         /// <summary>
-        /// Update the event-level data for a given sales order.
+        /// Assign or update the MAS SO # at the “Event” level.
+        /// This is called in a loop by the React front end for each row the user updates.
         /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
         [HttpPost("UpdateEventLevel")]
-        public async Task<IActionResult> UpdateEventLevel([FromBody] SalesOrderUpdateDto request)
+        public async Task<IActionResult> UpdateEventLevel([FromBody] EventLevelUpdateDto request)
         {
             _logger.LogInformation("UpdateEventLevel called with: {@Request}", request);
 
@@ -94,12 +93,11 @@ namespace AirwayAPI.Controllers.ReportControllers
         }
 
         /// <summary>
-        /// Update the detail-level data for a given sales order.
+        /// Assign or update the MAS SO # at the “Detail” level.
+        /// This is called in a loop by the React front end for each detail row the user updates.
         /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
         [HttpPost("UpdateDetailLevel")]
-        public async Task<IActionResult> UpdateDetailLevel([FromBody] EquipmentRequestUpdateDto request)
+        public async Task<IActionResult> UpdateDetailLevel([FromBody] DetailLevelUpdateDto request)
         {
             _logger.LogInformation("UpdateDetailLevel called with: {@Request}", request);
 
