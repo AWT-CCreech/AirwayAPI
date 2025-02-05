@@ -30,8 +30,7 @@ namespace AirwayAPI.Services
                 var (fullName, userEmail, jobTitle, directPhone, mobilePhone) = await GetSenderInfoAsync(emailInput.UserName);
 
                 // Ensure placeholders is not null
-                if (emailInput.Placeholders == null)
-                    emailInput.Placeholders = new Dictionary<string, string>();
+                emailInput.Placeholders ??= new Dictionary<string, string>();
 
                 // Fill placeholders if the caller didn't already set them
                 if (!emailInput.Placeholders.ContainsKey("%%NAME%%"))
@@ -127,7 +126,13 @@ namespace AirwayAPI.Services
                 return ("System", $"{username}@airway.com", "N/A", "N/A", "N/A");
             }
 
-            return (senderInfo.FullName, senderInfo.Email, senderInfo.JobTitle ?? "N/A", senderInfo.DirectPhone ?? "N/A", senderInfo.MobilePhone ?? "N/A");
+            return (
+                senderInfo.FullName,
+                senderInfo.Email ?? "N/A",
+                senderInfo.JobTitle ?? "N/A",
+                senderInfo.DirectPhone ?? "N/A",
+                senderInfo.MobilePhone ?? "N/A"
+            );
         }
 
         private static MimeMessage CreateEmailMessage(EmailInputBase emailInput)
@@ -223,8 +228,8 @@ namespace AirwayAPI.Services
                 var developerEmail = GetDeveloperEmail();
                 _logger.LogWarning("Development mode: Overriding all recipients to {CurrentUserEmail}", developerEmail);
 
-                emailInput.ToEmails = new List<string> { developerEmail };
-                emailInput.CCEmails = new List<string>();
+                emailInput.ToEmails = [developerEmail];
+                // emailInput.CCEmails = []; //uncomment
             }
         }
 
