@@ -176,7 +176,7 @@ namespace AirwayAPI.Controllers.ReportControllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating PO detail for ID {Id}", id);
+                _logger.LogError(ex, "Error updating PO detail for ID {RequestId}", id);
                 await transaction.RollbackAsync();
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
