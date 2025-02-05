@@ -26,8 +26,10 @@ namespace AirwayAPI.Controllers.UtilityControllers
                                    && u.ActiveSales == 1
                                    && u.Email != null
                                    && u.Email.Length > 1
+                                   && u.Uname != null
+                                   && u.Uname.Length > 1
                                    && !u.Uname.Contains("house")
-                                  || u.Uname == "JHerbst"
+                                   || u.Uname == "JHerbst"
                               orderby u.Uname
                               select new
                               {
