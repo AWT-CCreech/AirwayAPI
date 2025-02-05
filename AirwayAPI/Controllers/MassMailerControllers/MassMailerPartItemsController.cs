@@ -127,7 +127,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
 
                     items.Add(new MassMailerPartItem
                     {
-                        Id = requestID,
+                        RequestId = requestID,
                         PartNum = xPartNum.Trim() ?? "",
                         AltPartNum = altPartNum.Trim() ?? "",
                         PartDesc = partDesc ?? "",
@@ -171,7 +171,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 var part = markedPartsWithoutPartNum[i];
                 items.Add(new MassMailerPartItem
                 {
-                    Id = part.RequestId,
+                    RequestId = part.RequestId,
                     PartNum = part.PartNum ?? "",
                     AltPartNum = "",
                     PartDesc = part.PartDesc ?? "",

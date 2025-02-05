@@ -2,7 +2,7 @@
 {
     public class MassMailerPartItem
     {
-        public int Id { get; set; }
+        public int RequestId { get; set; }
         public string PartNum { get; set; }
         public string AltPartNum { get; set; }
         public string PartDesc { get; set; }
