@@ -12,20 +12,20 @@ namespace AirwayAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserLoginsController(
+    public class LoginController(
         eHelpDeskContext context,
-        ILogger<UserLoginsController> logger,
+        ILogger<LoginController> logger,
         ITokenService tokenService,
         IUserService userService) : ControllerBase
     {
         private readonly eHelpDeskContext _context = context;
-        private readonly ILogger<UserLoginsController> _logger = logger;
+        private readonly ILogger<LoginController> _logger = logger;
         private readonly ITokenService _tokenService = tokenService; // Inject ITokenService
         private readonly IUserService _userService = userService; // Inject IUserService
         private static readonly string[] predefinedUserArray = ["mgibson", "lvonder", "kgildersleeve"];
 
         [HttpPost]
-        public async Task<ActionResult<LoginInfo>> GetUsers([FromBody] LoginInfo login)
+        public async Task<ActionResult<LoginInfo>> LoginUser([FromBody] LoginInfo login)
         {
             if (string.IsNullOrWhiteSpace(login.username) || string.IsNullOrWhiteSpace(login.password))
             {
