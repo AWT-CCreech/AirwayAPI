@@ -60,7 +60,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 .Where(log => log.Deleted != true
                     && log.IssueDate >= dateStart
                     && log.IssueDate <= dateEnd
-                    && (CompanyID.Equals("all", StringComparison.OrdinalIgnoreCase) || log.CompanyId.ToLower() == CompanyID.ToLower()))
+                    && (CompanyID!.Equals("all", StringComparison.OrdinalIgnoreCase) || log.CompanyId!.ToLower() == CompanyID.ToLower()))
                 .Select(log => new PODeliveryLogSearchResult
                 {
                     Id = log.Id,
