@@ -34,11 +34,15 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<Department> Departments { get; set; }
 
+    public virtual DbSet<EmailLog> EmailLogs { get; set; }
+
     public virtual DbSet<EquipmentRequest> EquipmentRequests { get; set; }
 
     public virtual DbSet<EquipmentSnapshot> EquipmentSnapshots { get; set; }
 
     public virtual DbSet<MassMailHistory> MassMailHistories { get; set; }
+
+    public virtual DbSet<MassMailer> MassMailers { get; set; }
 
     public virtual DbSet<MasterSearchQuery> MasterSearchQueries { get; set; }
 
@@ -707,6 +711,19 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.Phone).HasMaxLength(50);
         });
 
+        modelBuilder.Entity<EmailLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__EmailLog__3214EC0706FE4246");
+
+            entity.Property(e => e.LoggedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LoggedBy).HasMaxLength(50);
+            entity.Property(e => e.OrderNumber).HasMaxLength(50);
+            entity.Property(e => e.OrderType).HasMaxLength(50);
+            entity.Property(e => e.SenderEmail).HasMaxLength(255);
+        });
+
         modelBuilder.Entity<EquipmentRequest>(entity =>
         {
             entity.HasKey(e => e.RequestId).IsClustered(false);
@@ -941,6 +958,22 @@ public partial class eHelpDeskContext : DbContext
                 .HasDefaultValue(0)
                 .HasColumnName("RequestID");
             entity.Property(e => e.RespondedTo).HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<MassMailer>(entity =>
+        {
+            entity.HasKey(e => e.MassMailId);
+
+            entity.ToTable("MassMailer");
+
+            entity.Property(e => e.MassMailId).HasColumnName("MassMailID");
+            entity.Property(e => e.DateSent)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.MassMailDesc)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.SentBy).HasDefaultValue(38);
         });
 
         modelBuilder.Entity<MasterSearchQuery>(entity =>
