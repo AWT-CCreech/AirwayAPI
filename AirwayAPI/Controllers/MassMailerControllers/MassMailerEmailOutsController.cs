@@ -108,8 +108,8 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                     var massMailIdParam = new SqlParameter
                     {
                         ParameterName = "@RequestId",
-                        SqlDbType = System.Data.SqlDbType.Int,
-                        Direction = System.Data.ParameterDirection.Output
+                        SqlDbType = SqlDbType.Int,
+                        Direction = ParameterDirection.Output
                     };
 
                     _context.Database.ExecuteSqlRaw(spCommandText, new[] { descParam, dateParam, userIdParam, massMailIdParam });
