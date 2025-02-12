@@ -25,7 +25,7 @@ builder.Services.AddCors(options =>
         {
             policy.AllowAnyHeader()
                   .AllowAnyMethod()
-                  .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8", "http://awt-portal-dev.eba-mwhx9dtr.us-east-2.elasticbeanstalk.com");
+                  .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8");
         });
 });
 
