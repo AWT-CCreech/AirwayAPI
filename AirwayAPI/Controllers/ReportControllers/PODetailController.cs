@@ -95,7 +95,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 EditedBy = poLogEntry.EditedBy,
                 ExpDelEditDate = poLogEntry.ExpDelEditDate ?? "",
                 NotesList = poLogEntry.Notes.Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}").ToList(),
-                ContactName = contactDetails?.Contact ?? "PLEASE UPDATE",
+                ContactName = contactDetails?.Contact ?? "",
                 Company = contactDetails?.Company ?? "",
                 Phone = contactDetails?.Phone ?? ""
             };
