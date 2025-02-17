@@ -1,5 +1,4 @@
-﻿using AirwayAPI.Application;
-using AirwayAPI.Data;
+﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Models.EmailModels;
 using AirwayAPI.Models.PODeliveryLogModels;
