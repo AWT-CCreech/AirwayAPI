@@ -32,7 +32,13 @@ namespace AirwayAPI.Controllers.ReportControllers
             [FromQuery] DateTime? date2 = null
         )
         {
-            var query = _context.OpenSoreports.AsQueryable();
+            // Cache the current time to avoid repeated evaluations.
+            var now = DateTime.Now;
+
+            // Use AsNoTracking for a read-only query.
+            var query = _context.OpenSoreports
+                .AsNoTracking()
+                .AsQueryable();
 
             // Apply filters
             if (!string.IsNullOrEmpty(soNum))
@@ -57,7 +63,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             if (reqDateStatus == "Late")
             {
-                query = query.Where(o => o.RequiredDate < DateTime.Now);
+                query = query.Where(o => o.RequiredDate < now);
             }
 
             if (salesTeam != "All")
@@ -82,88 +88,87 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             if (!string.IsNullOrEmpty(customer))
             {
-                if (chkExcludeCo)
-                {
-                    query = query.Where(o => o.CustomerName != null && !EF.Functions.Like(o.CustomerName, $"%{customer}%"));
-                }
-                else
-                {
-                    query = query.Where(o => o.CustomerName != null && EF.Functions.Like(o.CustomerName, $"%{customer}%"));
-                }
+                query = chkExcludeCo
+                    ? query.Where(o => o.CustomerName != null && !EF.Functions.Like(o.CustomerName, $"%{customer}%"))
+                    : query.Where(o => o.CustomerName != null && EF.Functions.Like(o.CustomerName, $"%{customer}%"));
             }
 
-            if (dateFilterType == "OrderDate" && date1.HasValue && date2.HasValue)
+            if (date1.HasValue && date2.HasValue)
             {
-                query = query.Where(o => o.OrderDate >= date1.Value && o.OrderDate <= date2.Value);
-            }
-            else if (dateFilterType == "ExpectedDelivery" && date1.HasValue && date2.HasValue)
-            {
-                query = query.Where(o => o.RequiredDate >= date1.Value && o.RequiredDate <= date2.Value);
+                if (dateFilterType == "OrderDate")
+                {
+                    query = query.Where(o => o.OrderDate >= date1.Value && o.OrderDate <= date2.Value);
+                }
+                else if (dateFilterType == "ExpectedDelivery")
+                {
+                    query = query.Where(o => o.RequiredDate >= date1.Value && o.RequiredDate <= date2.Value);
+                }
             }
 
             if (chkAllHere)
             {
-                query = query.Where(o => o.AllHere == true);
+                query = query.Where(o => o.AllHere);
             }
 
-            // Fetch the sales orders asynchronously
-            var salesOrders = await query
-                .Select(o => new
-                {
-                    o.EventId,
-                    o.Sonum,
-                    o.AccountTeam,
-                    o.CustomerName,
-                    o.CustPo,
-                    o.OrderDate,
-                    o.RequiredDate,
-                    o.ItemNum,
-                    o.MfgNum,
-                    o.AmountLeft,
-                    o.Ponum,
-                    o.PoissueDate,
-                    o.ExpectedDelivery,
-                    o.QtyOrdered,
-                    o.QtyReceived,
-                    o.LeftToShip,
-                    // Retrieve the latest PO Log entry
-                    PoLog = _context.TrkPologs
-                            .Where(poLog => poLog.Ponum == o.Ponum)
-                            .Join(_context.TrkPonotes,
-                                  poLog => poLog.Ponum,
-                                  poNote => poNote.Ponum.ToString(),
-                                  (poLog, poNote) => new
-                                  {
-                                      poLog.Id,
-                                      poNote.EnteredBy,
-                                      poNote.EntryDate
-                                  })
-                            .OrderByDescending(poNote => poNote.EntryDate)
-                            .FirstOrDefault(),
-                    notes = _context.TrkSonotes
-                        .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
-                        .Join(_context.CamContacts,
-                              n => n.ContactId,
-                              c => c.Id,
-                              (n, c) => new
-                              {
-                                  n.Notes,
-                                  n.EntryDate,
-                                  n.EnteredBy,
-                                  n.ContactId,
-                                  ContactName = c.Contact
-                              })
-                        .ToList()
-                })
-                .OrderBy(o => o.Sonum)
-                .ToListAsync(); // Changed to ToListAsync()
+            // Project the query to include related data via subqueries.
+            var salesOrdersQuery = query.Select(o => new
+            {
+                o.EventId,
+                o.Sonum,
+                o.AccountTeam,
+                o.CustomerName,
+                o.CustPo,
+                o.OrderDate,
+                o.RequiredDate,
+                o.ItemNum,
+                o.MfgNum,
+                o.AmountLeft,
+                o.Ponum,
+                o.PoissueDate,
+                o.ExpectedDelivery,
+                o.QtyOrdered,
+                o.QtyReceived,
+                o.LeftToShip,
+                PoLog = _context.TrkPologs
+                    .Where(poLog => poLog.Ponum == o.Ponum)
+                    .Join(_context.TrkPonotes,
+                          poLog => poLog.Ponum,
+                          poNote => poNote.Ponum.ToString(),
+                          (poLog, poNote) => new
+                          {
+                              poLog.Id,
+                              poNote.EnteredBy,
+                              poNote.EntryDate
+                          })
+                    .OrderByDescending(poNote => poNote.EntryDate)
+                    .FirstOrDefault(),
+                notes = _context.TrkSonotes
+                    .Where(n => n.OrderNo == o.Sonum && n.PartNo == o.ItemNum)
+                    .Join(_context.CamContacts,
+                          n => n.ContactId,
+                          c => c.Id,
+                          (n, c) => new
+                          {
+                              n.Notes,
+                              n.EntryDate,
+                              n.EnteredBy,
+                              n.ContactId,
+                              ContactName = c.Contact
+                          })
+                    .ToList()
+            })
+            .OrderBy(o => o.Sonum);
 
+            // Execute the query
+            var salesOrders = await salesOrdersQuery.ToListAsync();
+
+            // Optionally group by Sales Order number
             if (chkGroupBySo)
             {
                 var groupedOrders = salesOrders
                     .GroupBy(o => o.Sonum)
-                    .Select(g => g.First()) // Take the first order from each group
-                    .ToList(); // This remains synchronous as it's after fetching data
+                    .Select(g => g.First())
+                    .ToList();
 
                 return Ok(groupedOrders);
             }
