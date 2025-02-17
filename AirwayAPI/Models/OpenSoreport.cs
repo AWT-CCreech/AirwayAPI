@@ -52,7 +52,7 @@ public partial class OpenSoreport
 
     public DateTime? ExpectedDelivery { get; set; }
 
-    public bool? AllHere { get; set; }
+    public bool AllHere { get; set; }
 
     public bool? ReceivedOnPothatDay { get; set; }
 
