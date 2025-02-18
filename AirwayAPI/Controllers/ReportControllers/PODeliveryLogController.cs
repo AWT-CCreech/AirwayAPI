@@ -84,20 +84,24 @@ namespace AirwayAPI.Controllers.ReportControllers
                     IssuedBy = log.IssuedBy ?? "",
                     VendorName = _context.TrkRwPoheaders
                         .Where(p => p.Ponum == log.Ponum)
+                        .OrderByDescending(p => p.Ponum)
                         .Select(p => p.VendorNum)
                         .Distinct()
                         .Join(_context.TrkRwvendors, vn => vn, v => v.VendorNum, (vn, v) => v.VendorName)
                         .FirstOrDefault() ?? "",
                     ItemClassId = _context.TrkRwImItems
                         .Where(i => i.ItemNum == log.ItemNum && i.CompanyId == log.CompanyId)
+                        .OrderByDescending(i => i.ItemNum)
                         .Select(i => i.ItemClassId)
                         .FirstOrDefault(),
                     AltPartNum = _context.TrkRwImItems
                         .Where(i => i.ItemNum == log.ItemNum && i.CompanyId == log.CompanyId)
+                        .OrderByDescending(i => i.ItemNum)
                         .Select(i => i.AltPartNum)
                         .FirstOrDefault() ?? "",
                     Postatus = _context.TrkRwPoheaders
                         .Where(p => p.Ponum == log.Ponum)
+                        .OrderByDescending(p => p.Ponum)
                         .Select(p => p.Postatus)
                         .FirstOrDefault(),
                     CompanyId = log.CompanyId ?? "",
@@ -199,7 +203,7 @@ namespace AirwayAPI.Controllers.ReportControllers
                 }
             }
 
-            if (EquipType.Equals("anc", StringComparison.OrdinalIgnoreCase))
+            if (EquipType!.Equals("anc", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Applying EquipType filter: Anc");
                 query = query.Where(l => l.ItemClassId == 23);
@@ -354,7 +358,6 @@ namespace AirwayAPI.Controllers.ReportControllers
                     case "fne":
                         query = query.Where(l => l.VendorName != null && l.VendorName.ToLower() == "fne");
                         break;
-                        // Add other cases if necessary
                 }
             }
 
@@ -362,7 +365,6 @@ namespace AirwayAPI.Controllers.ReportControllers
             var vendors = await query
                 .Select(v => v.VendorName)
                 .Distinct()
-                .OrderBy(v => v)
                 .ToListAsync();
 
             _logger.LogInformation("Retrieved {Count} Vendors after filtering", vendors.Count);
