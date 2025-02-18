@@ -4,7 +4,7 @@ namespace AirwayAPI.Models.DropShipModels
 {
     public class DropShipEmailInput : EmailInputBase
     {
-        public List<string> RecipientNames { get; set; } = new List<string>();
+        public List<string> RecipientNames { get; set; } = [];
         public string PONumber { get; set; }
         public string SONumber { get; set; }
         public string PartNumber { get; set; }
