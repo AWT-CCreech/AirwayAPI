@@ -33,11 +33,13 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 return NotFound($"User '{username}' not found.");
             }
 
+            DateTime now = DateTime.Now;
+            DateTime twoYearsAgo = now.AddYears(-2);
             // Join MassMailers with MassMailHistories and filter by the user ID.
-            var histories = await (from history in _context.MassMailHistories
+            List<MassMailHistory> histories = await (from history in _context.MassMailHistories
                                    join mail in _context.MassMailers
                                      on history.MassMailId equals mail.MassMailId
-                                   where mail.SentBy.HasValue && mail.SentBy.Value == userId
+                                   where mail.SentBy.HasValue && mail.SentBy.Value == userId && mail.DateSent > twoYearsAgo
                                    orderby history.Id descending
                                    select history)
                                    .ToListAsync();
