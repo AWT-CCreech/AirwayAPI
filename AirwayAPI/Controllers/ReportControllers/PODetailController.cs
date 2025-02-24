@@ -9,14 +9,28 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
+    // NOTE: Ideally, this DTO should be in its own file (for example, Models/NoteDto.cs)
+    public class NoteDto
+    {
+        public string Note { get; set; }
+        public string EnteredBy { get; set; }
+    }
+
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger) : ControllerBase
+    public class PODetailController : ControllerBase
     {
-        private readonly eHelpDeskContext _context = context ?? throw new ArgumentNullException(nameof(context));
-        private readonly IEmailService _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
-        private readonly ILogger<PODetailController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        private readonly eHelpDeskContext _context;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<PODetailController> _logger;
+
+        public PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         // GET: api/PODetail/id/{id}
         [HttpGet("id/{id}")]
@@ -38,7 +52,9 @@ namespace AirwayAPI.Controllers.ReportControllers
                     p.IssuedBy,
                     p.DateDelivered,
                     p.EditDate,
-                    EditedBy = _context.Users.Where(u => u.Id == p.EditedBy).Select(u => u.Uname).FirstOrDefault(),
+                    EditedBy = _context.Users.Where(u => u.Id == p.EditedBy)
+                                               .Select(u => u.Uname)
+                                               .FirstOrDefault(),
                     p.ExpDelEditDate,
                     Notes = _context.TrkPonotes
                         .Where(n => n.Ponum.ToString() == p.Ponum)
@@ -54,12 +70,14 @@ namespace AirwayAPI.Controllers.ReportControllers
                         .Select(c => new
                         {
                             c.Contact,
+                            c.Title,
                             c.Company,
                             Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
                         }).FirstOrDefault()
                 }).FirstOrDefaultAsync();
 
-            if (poLogEntry == null) return NotFound("PO log entry not found.");
+            if (poLogEntry == null)
+                return NotFound("PO log entry not found.");
 
             // If ContactId is missing, attempt to retrieve it from RequestPos
             int? contactId = poLogEntry.ContactId;
@@ -72,30 +90,38 @@ namespace AirwayAPI.Controllers.ReportControllers
             var contactDetails = contactId.HasValue
                 ? await _context.CamContacts
                     .Where(c => c.Id == contactId)
-                    .Select(c => new { c.Contact, c.Company, Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain })
+                    .Select(c => new
+                    {
+                        c.Contact,
+                        c.Title,
+                        c.Company,
+                        Phone = !string.IsNullOrEmpty(c.PhoneDirect) ? c.PhoneDirect : c.PhoneMain
+                    })
                     .FirstOrDefaultAsync()
                 : null;
 
-            // Map to DTO
             var poDetailDto = new PODetailUpdateDto
             {
                 Id = poLogEntry.Id,
                 PONum = poLogEntry.Ponum ?? "",
                 SONum = poLogEntry.SalesOrderNum ?? "",
-                PartNum = poLogEntry.ItemNum ?? "",
+                PartNum = poLogEntry.ItemNum,
                 QtyOrdered = poLogEntry.QtyOrdered,
                 QtyReceived = poLogEntry.QtyReceived,
-                ReceiverNum = poLogEntry.ReceiverNum ?? 0,
+                ReceiverNum = poLogEntry.ReceiverNum,
                 ExpectedDelivery = poLogEntry.ExpectedDelivery,
-                ContactID = contactId ?? 0,
+                ContactID = contactId,
                 IssuedBy = poLogEntry.IssuedBy ?? "",
                 DateDelivered = poLogEntry.DateDelivered,
                 EditDate = poLogEntry.EditDate,
                 EditedBy = poLogEntry.EditedBy,
                 ExpDelEditDate = poLogEntry.ExpDelEditDate ?? "",
-                NotesList = poLogEntry.Notes.Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}").ToList(),
+                NotesList = poLogEntry.Notes
+                    .Select(note => $"{note.EnteredBy}::{note.Notes}::{(note.EntryDate.HasValue ? note.EntryDate.Value.ToShortDateString() : "No Date")}")
+                    .ToList(),
                 ContactName = contactDetails?.Contact ?? "",
                 Company = contactDetails?.Company ?? "",
+                Title = contactDetails?.Title ?? "",
                 Phone = contactDetails?.Phone ?? ""
             };
 
@@ -103,15 +129,18 @@ namespace AirwayAPI.Controllers.ReportControllers
         }
 
         // PUT: api/PODetail/{id}
+        // Updates main PO fields (does not include note submission).
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePODetail(int id, [FromBody] PODetailUpdateDto updateDto)
         {
-            if (id != updateDto.Id) return BadRequest("ID mismatch.");
+            if (id != updateDto.Id)
+                return BadRequest("ID mismatch.");
 
             var poLogEntry = await _context.TrkPologs.FindAsync(id);
-            if (poLogEntry == null) return NotFound("PO log entry not found.");
+            if (poLogEntry == null)
+                return NotFound("PO log entry not found.");
 
-            // Retrieve SONum if not provided
+            // Retrieve SONum if not provided.
             if (string.IsNullOrEmpty(updateDto.SONum))
             {
                 var retrievedSONum = await _context.EquipmentRequests
@@ -127,24 +156,20 @@ namespace AirwayAPI.Controllers.ReportControllers
                 updateDto.SONum = retrievedSONum ?? updateDto.SONum;
             }
 
-            // Ensure ExpectedDelivery is valid
             if (!updateDto.ExpectedDelivery.HasValue)
-            {
                 return BadRequest("Expected Delivery date is invalid or missing.");
-            }
 
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 bool expectedDeliveryChanged = poLogEntry.ExpectedDelivery != updateDto.ExpectedDelivery;
 
-                // Update PO Log entry
                 UpdatePODetailFields(poLogEntry, updateDto);
 
-                // Additional field updates
                 poLogEntry.QtyOrdered = updateDto.QtyOrdered;
                 poLogEntry.QtyReceived = updateDto.QtyReceived;
                 poLogEntry.ReceiverNum = updateDto.ReceiverNum;
+                poLogEntry.ContactId = updateDto.ContactID;
 
                 if (expectedDeliveryChanged)
                 {
@@ -153,16 +178,9 @@ namespace AirwayAPI.Controllers.ReportControllers
 
                 if (updateDto.UpdateAllDates)
                 {
-                    await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId!);
+                    await UpdateAllPODeliveryDates(poLogEntry.Ponum!, updateDto.ExpectedDelivery, updateDto.UserId);
                 }
 
-                // Add new notes if present
-                if (!string.IsNullOrEmpty(updateDto.NewNote))
-                {
-                    await AddNewNoteAsync(poLogEntry, updateDto.NewNote, updateDto.UserName);
-                }
-
-                // Send Email if conditions are met
                 if (expectedDeliveryChanged)
                 {
                     await CheckAndSendDeliveryDateEmail(poLogEntry, updateDto);
@@ -170,7 +188,6 @@ namespace AirwayAPI.Controllers.ReportControllers
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-
                 return NoContent();
             }
             catch (Exception ex)
@@ -179,6 +196,20 @@ namespace AirwayAPI.Controllers.ReportControllers
                 await transaction.RollbackAsync();
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+
+        // PUT: api/PODetail/{id}/note
+        // Adds a note without updating other PO log fields.
+        [HttpPut("{id}/note")]
+        public async Task<IActionResult> AddNoteToPODetail(int id, [FromBody] NoteDto noteDto)
+        {
+            var poLogEntry = await _context.TrkPologs.FindAsync(id);
+            if (poLogEntry == null)
+                return NotFound("PO log entry not found.");
+
+            await AddNewNoteAsync(poLogEntry, noteDto.Note, noteDto.EnteredBy);
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
 
         private async Task UpdateRequestPOsAndHistory(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
@@ -194,7 +225,6 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             foreach (var requestPO in requestPOs)
             {
-                // Track the history before updating
                 var history = new RequestPohistory
                 {
                     Poid = requestPO.Id,
@@ -206,12 +236,9 @@ namespace AirwayAPI.Controllers.ReportControllers
                 };
 
                 _context.RequestPohistories.Add(history);
-
-                // Update the request PO
                 requestPO.DeliveryDate = updateDto.ExpectedDelivery;
                 requestPO.EditedBy = updateDto.UserId;
                 requestPO.EditDate = DateTime.Now;
-
                 _context.RequestPos.Update(requestPO);
             }
 
@@ -220,17 +247,21 @@ namespace AirwayAPI.Controllers.ReportControllers
 
         private async Task AddNewNoteAsync(TrkPolog poLogEntry, string note, string enteredBy)
         {
+            // Add note to TrkSonote
             var newSoNote = new TrkSonote
             {
                 OrderNo = poLogEntry.SalesOrderNum,
                 PartNo = poLogEntry.ItemNum,
-                Notes = note,
                 EnteredBy = enteredBy,
                 EntryDate = DateTime.Now,
                 ModBy = enteredBy,
-                ModDate = DateTime.Now
+                ModDate = DateTime.Now,
+                NoteType = "Note",
+                Notes = note,
+                ContactId = poLogEntry.ContactId
             };
 
+            // Add note to TrkPonote
             var newPoNote = new TrkPonote
             {
                 Ponum = int.TryParse(poLogEntry.Ponum, out int parsedPonum) ? parsedPonum : null,
@@ -241,7 +272,34 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             await _context.TrkSonotes.AddAsync(newSoNote);
             await _context.TrkPonotes.AddAsync(newPoNote);
-            await InsertCAMActivityAsync(poLogEntry.ContactId ?? 0, poLogEntry.Ponum!, note, enteredBy);
+            await InsertCAMActivityAsync(poLogEntry.ContactId, poLogEntry.Ponum!, note, enteredBy);
+        }
+
+        private async Task InsertCAMActivityAsync(int? contactId, string poNum, string note, string enteredBy)
+        {
+            if (!contactId.HasValue)
+                return;
+
+            string camNote = $"OPEN PO UPDATE FOR PO#{poNum}: {note}";
+            var camActivity = new CamActivity
+            {
+                ContactId = contactId.Value,
+                ActivityOwner = enteredBy,
+                ActivityType = "CallOut",
+                DurationHours = 0,
+                DurationMins = 0,
+                ProjectCode = "",
+                Notes = camNote,
+                ActivityDate = DateTime.Now,
+                EnteredBy = enteredBy,
+                ModifiedBy = enteredBy,
+                CompletedBy = enteredBy,
+                ModifiedDate = DateTime.Now,
+                CompleteDate = DateTime.Now,
+                ContactOverride = 0
+            };
+
+            await _context.CamActivities.AddAsync(camActivity);
         }
 
         private async Task CheckAndSendDeliveryDateEmail(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
@@ -264,7 +322,6 @@ namespace AirwayAPI.Controllers.ReportControllers
                     {
                         poLogEntry.DeliveryDateEmail = true;
                         _logger.LogInformation("Preparing email for delayed delivery of Sales Order {Sonum}", poLogEntry.SalesOrderNum);
-
                         var salesRep = await _context.Users.FirstOrDefaultAsync(u => u.Id == salesOrder.AccountMgr);
                         if (salesRep != null && !string.IsNullOrEmpty(salesRep.Email))
                         {
@@ -279,16 +336,23 @@ namespace AirwayAPI.Controllers.ReportControllers
                                 { "{{Notes}}", updateDto.NewNote ?? "" }
                             };
 
-                            var emailInput = new EmailInputBase
+                            var emailInput = new PODetailEmailInput
                             {
                                 ToEmails = [salesRep.Email],
-                                FromEmail = "ccreech@airway.com",
+                                FromEmail = "purch_dept@airway.com",
                                 UserName = updateDto.UserName,
                                 Password = updateDto.Password,
                                 Subject = updateDto.UrgentEmail
                                     ? $"*** PO#{updateDto.PONum} DELAYED BY {(updateDto.ExpectedDelivery.Value - saleReqDate.Value).Days} DAYS ***"
                                     : $"PO#{updateDto.PONum} Delivery Date Exceeds Required Date for SO#{poLogEntry.SalesOrderNum}",
-                                Placeholders = placeholders
+                                Placeholders = placeholders,
+                                SoNum = poLogEntry.SalesOrderNum ?? "",
+                                SalesRep = salesRep.Uname ?? "",
+                                CompanyName = salesOrder.ShipToCompanyName ?? "",
+                                SalesRequiredDate = saleReqDate.Value.ToShortDateString(),
+                                ExpectedDeliveryDate = updateDto.ExpectedDelivery.Value.ToShortDateString(),
+                                PartNumber = poLogEntry.ItemNum ?? "",
+                                Notes = updateDto.NewNote ?? ""
                             };
 
                             await _emailService.SendEmailAsync(emailInput);
@@ -326,39 +390,13 @@ namespace AirwayAPI.Controllers.ReportControllers
                 poLog.EditDate = DateTime.Now;
                 poLog.EditedBy = userId;
             }
-
             await _context.SaveChangesAsync();
-        }
-
-        private async Task InsertCAMActivityAsync(int contactId, string poNum, string note, string enteredBy)
-        {
-            string camNote = $"OPEN PO UPDATE FOR PO#{poNum}: {note}";
-
-            var camActivity = new CamActivity
-            {
-                ContactId = contactId,
-                ActivityOwner = enteredBy,
-                ActivityType = "CallOut",
-                DurationHours = 0,
-                DurationMins = 0,
-                ProjectCode = "",
-                Notes = camNote,
-                ActivityDate = DateTime.Now,
-                EnteredBy = enteredBy,
-                ModifiedBy = enteredBy,
-                CompletedBy = enteredBy,
-                ModifiedDate = DateTime.Now,
-                CompleteDate = DateTime.Now,
-                ContactOverride = 0,
-            };
-
-            await _context.CamActivities.AddAsync(camActivity);
         }
 
         private static void UpdatePODetailFields(TrkPolog poLogEntry, PODetailUpdateDto updateDto)
         {
             poLogEntry.EditDate = DateTime.Now;
-            poLogEntry.EditedBy = updateDto.UserId!;
+            poLogEntry.EditedBy = updateDto.UserId;
             poLogEntry.ContactId = updateDto.ContactID;
             poLogEntry.ExpectedDelivery = updateDto.ExpectedDelivery;
 
