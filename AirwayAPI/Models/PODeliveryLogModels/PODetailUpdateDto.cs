@@ -8,9 +8,9 @@
         public string PartNum { get; set; }
         public int? QtyOrdered { get; set; }
         public int? QtyReceived { get; set; }
-        public int ReceiverNum { get; set; }
+        public int? ReceiverNum { get; set; }
         public DateTime? ExpectedDelivery { get; set; }
-        public int ContactID { get; set; }
+        public int? ContactID { get; set; }
         public string IssuedBy { get; set; }
         public DateTime? DateDelivered { get; set; }
         public DateTime? EditDate { get; set; }
@@ -25,6 +25,7 @@
         public bool UrgentEmail { get; set; }
         public string ContactName { get; set; }
         public string Company { get; set; }
+        public string Title { get; set; }
         public string Phone { get; set; }
     }
 }
