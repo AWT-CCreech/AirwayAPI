@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.EmailModels;
+using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -9,28 +9,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Controllers.ReportControllers
 {
-    // NOTE: Ideally, this DTO should be in its own file (for example, Models/NoteDto.cs)
-    public class NoteDto
-    {
-        public string Note { get; set; }
-        public string EnteredBy { get; set; }
-    }
-
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PODetailController : ControllerBase
+    public class PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly IEmailService _emailService;
-        private readonly ILogger<PODetailController> _logger;
-
-        public PODetailController(eHelpDeskContext context, IEmailService emailService, ILogger<PODetailController> logger)
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+        private readonly eHelpDeskContext _context = context ?? throw new ArgumentNullException(nameof(context));
+        private readonly IEmailService _emailService = emailService ?? throw new ArgumentNullException(nameof(emailService));
+        private readonly ILogger<PODetailController> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // GET: api/PODetail/id/{id}
         [HttpGet("id/{id}")]
