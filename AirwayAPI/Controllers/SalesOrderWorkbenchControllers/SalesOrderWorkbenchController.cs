@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using AirwayAPI.Services.Interfaces;
 using AirwayAPI.Models.DTOs;
 
-namespace AirwayAPI.Controllers.ReportControllers
+namespace AirwayAPI.Controllers.SalesOrderWorkbenchControllers
 {
     [Authorize]
     [ApiController]
