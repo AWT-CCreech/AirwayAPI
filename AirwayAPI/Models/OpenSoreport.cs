@@ -1,4 +1,7 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class OpenSoreport
 {
@@ -52,7 +55,7 @@ public partial class OpenSoreport
 
     public DateTime? ExpectedDelivery { get; set; }
 
-    public bool AllHere { get; set; }
+    public bool? AllHere { get; set; }
 
     public bool? ReceivedOnPothatDay { get; set; }
 

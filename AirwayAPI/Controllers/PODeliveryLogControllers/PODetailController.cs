@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.ReportControllers
+namespace AirwayAPI.Controllers.PODeliveryLogControllers
 {
     [Authorize]
     [ApiController]

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirwayAPI.Controllers.ReportControllers
+namespace AirwayAPI.Controllers.OpenSalesOrderControllers
 {
     [Authorize]
     [ApiController]
@@ -107,7 +107,7 @@ namespace AirwayAPI.Controllers.ReportControllers
 
             if (chkAllHere)
             {
-                query = query.Where(o => o.AllHere);
+                query = query.Where(o => (bool)o.AllHere);
             }
 
             // Project the query to include related data via subqueries.
