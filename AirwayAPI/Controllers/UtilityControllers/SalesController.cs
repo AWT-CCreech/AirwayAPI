@@ -42,7 +42,10 @@ namespace AirwayAPI.Controllers.UtilityControllers
             return Ok(reps);
         }
 
-
+        /// <summary>
+        /// Retrieves active sales teams.
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("GetSalesTeams")]
         public async Task<IActionResult> GetSalesTeams()
         {
@@ -57,6 +60,10 @@ namespace AirwayAPI.Controllers.UtilityControllers
             return Ok(teams);
         }
 
+        /// <summary>
+        /// Retreves sales categories.
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("GetCategories")]
         public async Task<IActionResult> GetCategories()
         {
@@ -71,6 +78,10 @@ namespace AirwayAPI.Controllers.UtilityControllers
             return Ok(categories);
         }
 
+        /// <summary>
+        /// Retreieves sales account numbers.
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("GetAccountNumbers")]
         public async Task<IActionResult> GetAccountNumbers()
         {
