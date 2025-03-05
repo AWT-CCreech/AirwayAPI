@@ -30,9 +30,17 @@ builder.Services.AddCors(options =>
 });
 
 // Registering the DbContext with dependency injection as Scoped (default)
+// eHelpDeskContext from the eHelpDesk database
 builder.Services.AddDbContext<eHelpDeskContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("eHelpDeskConnection"));
+});
+
+// REGISTER THE SECOND DB CONTEXT
+// MAS500AppContext from the mas500_app database (scaffolded with tarInvoice table)
+builder.Services.AddDbContext<MAS500AppContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MAS500AppConnection"));
 });
 
 // Register services with their corresponding interfaces
