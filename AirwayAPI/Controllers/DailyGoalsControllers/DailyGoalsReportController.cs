@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace AirwayAPI.Controllers.DailyGoalsControllers
 {
@@ -144,7 +145,7 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
                     Date = vDate,
                     DailySold = dailySold,
                     DailyShipped = dailyShipped,
-                    DisplayBackOrder = (decimal)displayBackOrder
+                    UnshippedBackOrder = (decimal)displayBackOrder
                 });
             }
 
@@ -163,6 +164,87 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
             };
 
             return Ok(report);
+        }
+
+        [HttpGet("detail")]
+        public async Task<IActionResult> GetDailyGoalsDetail([FromQuery] string DisplayType, [FromQuery] string SearchDate)
+        {
+            if (string.IsNullOrEmpty(DisplayType) || string.IsNullOrEmpty(SearchDate))
+            {
+                return BadRequest("Missing DisplayType or SearchDate");
+            }
+
+            // Attempt to parse the SearchDate. Adjust the format if needed.
+            if (!DateTime.TryParse(SearchDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime searchDate))
+            {
+                return BadRequest("Invalid date format.");
+            }
+
+            List<DailyGoalDetail> details = [];
+
+            if (DisplayType.Equals("Sold", StringComparison.OrdinalIgnoreCase))
+            {
+                // Query for Sold details from trkRwSoHeader
+                details = await _context.TrkRwSoheaders
+                    .Where(x => x.OrderDate == searchDate.Date &&
+                                x.CompanyId == "AIR" &&
+                                x.Type != 3 && x.Type != 2)
+                    .OrderBy(x => x.CustomerName)
+                    .Select(x => new DailyGoalDetail
+                    {
+                        OrderNum = x.OrderNum,
+                        CustomerName = x.CustomerName,
+                        QuoteTotal = (decimal)x.QuoteTotal
+                    })
+                    .ToListAsync();
+            }
+            else if (DisplayType.Equals("Shipped", StringComparison.OrdinalIgnoreCase))
+            {
+                // Query for Shipped details from MAS500_app
+                details = await (
+                    from inv in _mas500Context.TarInvoices
+                    join cust in _mas500Context.TarCustomers on inv.CustKey equals cust.CustKey into custGroup
+                    from customer in custGroup.DefaultIfEmpty()
+                    where inv.PostDate.Date == searchDate.Date && inv.CompanyId == "AIR"
+                    orderby customer.CustName
+                    select new DailyGoalDetail
+                    {
+                        // Mimic the ASP code: extract the last 6 characters for the OrderNum.
+                        OrderNum = inv.TranNo.Length >= 6 ? inv.TranNo.Substring(inv.TranNo.Length - 6) : inv.TranNo,
+                        CustomerName = customer != null ? customer.CustName : string.Empty,
+                        QuoteTotal = inv.SalesAmt,
+                        // Optional: You can extend these queries to calculate costs.
+                        InvoiceCost = 0,
+                        ConsignCost = 0
+                    }
+                ).ToListAsync();
+            }
+            else if (DisplayType.Equals("Unshipped", StringComparison.OrdinalIgnoreCase))
+            {
+                // Query for Unshipped details using a join between TrkUnshippedByitemno and trkRwSoHeader.
+                // This example assumes that you have a DbSet<TrkUnshippedByitemno> in _context.
+                details = await (
+                    from un in _context.TrkUnshippedByItemNos
+                    join so in _context.TrkRwSoheaders on un.SoNo equals so.OrderNum
+                    where un.DateRecorded == searchDate.Date &&
+                          so.CompanyId == "AIR" &&
+                          so.Type != 3 && so.Type != 2
+                    group new { un, so } by new { so.OrderNum, so.CustomerName } into g
+                    orderby g.Key.OrderNum
+                    select new DailyGoalDetail
+                    {
+                        OrderNum = g.Key.OrderNum,
+                        CustomerName = g.Key.CustomerName,
+                        QuoteTotal = (decimal)g.Sum(x => x.un.UnshippedValue)
+                    }
+                ).ToListAsync();
+            }
+            else
+            {
+                return BadRequest("Invalid DisplayType");
+            }
+
+            return Ok(details);
         }
     }
 }
