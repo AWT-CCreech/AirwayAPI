@@ -108,6 +108,10 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<TrkSonote> TrkSonotes { get; set; }
 
+    public virtual DbSet<TrkUnshippedByItemNo> TrkUnshippedByItemNos { get; set; }
+
+    public virtual DbSet<TrkUnshippedBySo> TrkUnshippedBySos { get; set; }
+
     public virtual DbSet<TrkUnshippedValue> TrkUnshippedValues { get; set; }
 
     public virtual DbSet<TrkUsage> TrkUsages { get; set; }
@@ -117,6 +121,10 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<UserPortalMenu> UserPortalMenus { get; set; }
 
     public virtual DbSet<UserPref> UserPrefs { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=AWTSQL19;Database=eHelpDesk;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -2222,6 +2230,54 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.Notes).HasColumnType("ntext");
             entity.Property(e => e.OrderNo).HasMaxLength(50);
             entity.Property(e => e.PartNo).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<TrkUnshippedByItemNo>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkUnshippedByItemNo");
+
+            entity.HasIndex(e => e.DateRecorded, "IX_trkUnshippedByItemNo_DateRecorded").HasFillFactor(80);
+
+            entity.Property(e => e.AccountNum)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.DateRecorded).HasColumnType("datetime");
+            entity.Property(e => e.ItemNum)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.QtyUnshipped).HasComputedColumnSql("([QtyOrdered]-[QtyShipped])", false);
+            entity.Property(e => e.RowId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("rowID");
+            entity.Property(e => e.SalesTeam)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.SoNo)
+                .HasMaxLength(10)
+                .IsUnicode(false);
+            entity.Property(e => e.UnitPrice)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.UnshippedValue)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+        });
+
+        modelBuilder.Entity<TrkUnshippedBySo>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("trkUnshippedBySo");
+
+            entity.HasIndex(e => e.DateRecorded, "IX_trkUnshippedBySo_DateRec");
+
+            entity.Property(e => e.DateRecorded).HasColumnType("datetime");
+            entity.Property(e => e.SoNo)
+                .HasMaxLength(10)
+                .IsUnicode(false);
+            entity.Property(e => e.UnshippedValue).HasColumnType("money");
         });
 
         modelBuilder.Entity<TrkUnshippedValue>(entity =>
