@@ -27,7 +27,7 @@ namespace AirwayAPI.Controllers.OpenSalesOrderControllers
             [FromQuery] bool chkExcludeCo = false,
             [FromQuery] bool chkGroupBySo = false,
             [FromQuery] bool chkAllHere = false,
-            [FromQuery] string? dateFilterType = "OrderDate",
+            [FromQuery] string? dateFilterType = "SoTranDate",
             [FromQuery] DateTime? date1 = null,
             [FromQuery] DateTime? date2 = null
         )
@@ -95,7 +95,7 @@ namespace AirwayAPI.Controllers.OpenSalesOrderControllers
 
             if (date1.HasValue && date2.HasValue)
             {
-                if (dateFilterType == "OrderDate")
+                if (dateFilterType == "SoTranDate")
                 {
                     query = query.Where(o => o.OrderDate >= date1.Value && o.OrderDate <= date2.Value);
                 }
