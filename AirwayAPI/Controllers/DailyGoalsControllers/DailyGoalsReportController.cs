@@ -209,7 +209,7 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
                     orderby customer.CustName
                     select new DailyGoalDetail
                     {
-                        // Mimic the ASP code: extract the last 6 characters for the OrderNum.
+                        // Mimic the ASP code: extract the last 6 characters for the SoTranNo.
                         OrderNum = inv.TranNo.Length >= 6 ? inv.TranNo.Substring(inv.TranNo.Length - 6) : inv.TranNo,
                         CustomerName = customer != null ? customer.CustName : string.Empty,
                         QuoteTotal = inv.SalesAmt,
