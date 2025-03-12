@@ -11,16 +11,10 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class DailyGoalsReportController : ControllerBase
+    public class DailyGoalsReportController(eHelpDeskContext context, MAS500AppContext mas500Context) : ControllerBase
     {
-        private readonly eHelpDeskContext _context;
-        private readonly MAS500AppContext _mas500Context;
-
-        public DailyGoalsReportController(eHelpDeskContext context, MAS500AppContext mas500Context)
-        {
-            _context = context;
-            _mas500Context = mas500Context;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly MAS500AppContext _mas500Context = mas500Context;
 
         [HttpGet]
         public async Task<IActionResult> GetDailyGoalsReport([FromQuery] string Months, [FromQuery] string Years)
@@ -31,8 +25,8 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
 
             // Define start and end dates for the month
             int daysInMonth = DateTime.DaysInMonth(nYears, nMonths);
-            DateTime startOfMonth = new DateTime(nYears, nMonths, 1);
-            DateTime endOfMonth = new DateTime(nYears, nMonths, daysInMonth);
+            DateTime startOfMonth = new(nYears, nMonths, 1);
+            DateTime endOfMonth = new(nYears, nMonths, daysInMonth);
 
             // -----------------------------------------------------------------------
             // Execute stored procedure via output parameters
