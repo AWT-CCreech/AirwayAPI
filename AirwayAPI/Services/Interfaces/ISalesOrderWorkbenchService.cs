@@ -1,4 +1,4 @@
-﻿using AirwayAPI.Models.DTOs;
+﻿using AirwayAPI.Models.SalesOrderWorkbenchModels;
 
 namespace AirwayAPI.Services.Interfaces
 {

@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.GenericDtos;
 using AirwayAPI.Models.PODeliveryLogModels;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;

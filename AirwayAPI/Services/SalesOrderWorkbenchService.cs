@@ -1,7 +1,7 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.DTOs;
 using AirwayAPI.Models.EmailModels;
+using AirwayAPI.Models.SalesOrderWorkbenchModels;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -232,7 +232,6 @@ namespace AirwayAPI.Services
                 await _context.SaveChangesAsync();
 
                 // 5) Optionally send email to replicate old detail-level email logic 
-                //    (but in your classic code, detail-level was almost the same as event-level).
                 await NotifyDetailLevelChanges(request, equipmentRequest);
 
                 await transaction.CommitAsync();
@@ -511,13 +510,9 @@ namespace AirwayAPI.Services
             }
         }
 
-        /// <summary>
-        /// Optional: If your detail-level updates also require unique emails,
-        /// you can replicate the same Verizon / Non-Verizon logic, or skip if unneeded.
-        /// </summary>
         private async Task NotifyDetailLevelChanges(DetailLevelUpdateDto request, EquipmentRequest eqReq)
         {
-            // Basic example: Just send a success email, or replicate advanced logic if needed
+            // Advance logic if needed
             await _emailService.SendEmailAsync(new EmailInputBase
             {
                 //FromEmail = "ITDept@airway.com",

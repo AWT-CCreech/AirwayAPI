@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Models.DTOs
+﻿namespace AirwayAPI.Models.GenericDtos
 {
     public class NoteDto
     {

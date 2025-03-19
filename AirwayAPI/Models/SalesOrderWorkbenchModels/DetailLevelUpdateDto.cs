@@ -1,4 +1,4 @@
-﻿namespace AirwayAPI.Models.DTOs
+﻿namespace AirwayAPI.Models.SalesOrderWorkbenchModels
 {
     public class DetailLevelUpdateDto
     {
