@@ -216,7 +216,6 @@ namespace AirwayAPI.Controllers.DailyGoalsControllers
             else if (DisplayType.Equals("Unshipped", StringComparison.OrdinalIgnoreCase))
             {
                 // Query for Unshipped details using a join between TrkUnshippedByitemno and trkRwSoHeader.
-                // This example assumes that you have a DbSet<TrkUnshippedByitemno> in _context.
                 details = await (
                     from un in _context.TrkUnshippedByItemNos
                     join so in _context.TrkRwSoheaders on un.SoNo equals so.OrderNum
