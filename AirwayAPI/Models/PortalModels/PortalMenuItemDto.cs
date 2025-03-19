@@ -9,6 +9,8 @@
         public string ItemType { get; set; } = null!;
         public int Ordering { get; set; }
         public int ColumnGroup { get; set; }
+        public bool IsFavorite { get; set; }
         public List<PortalMenuItemDto> Children { get; set; } = [];
     }
+
 }
