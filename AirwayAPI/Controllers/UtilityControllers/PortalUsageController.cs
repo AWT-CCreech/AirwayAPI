@@ -1,6 +1,6 @@
 ﻿using AirwayAPI.Data;
 using AirwayAPI.Models;
-using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.PortalModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
