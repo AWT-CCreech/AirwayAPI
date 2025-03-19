@@ -48,7 +48,17 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<PhoneNumber> PhoneNumbers { get; set; }
 
+    public virtual DbSet<PortalItem> PortalItems { get; set; }
+
     public virtual DbSet<PortalMenu> PortalMenus { get; set; }
+
+    public virtual DbSet<PortalRoute> PortalRoutes { get; set; }
+
+    public virtual DbSet<PortalUserConfig> PortalUserConfigs { get; set; }
+
+    public virtual DbSet<PortalUserFavorite> PortalUserFavorites { get; set; }
+
+    public virtual DbSet<PortalWorkspace> PortalWorkspaces { get; set; }
 
     public virtual DbSet<QtQuote> QtQuotes { get; set; }
 
@@ -1083,6 +1093,47 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.UserId).HasColumnName("UserID");
         });
 
+        modelBuilder.Entity<PortalItem>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__portal_i__3213E83F721A5A11");
+
+            entity.ToTable("portal_items");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ColumnGroup)
+                .HasDefaultValue(1)
+                .HasColumnName("column_group");
+            entity.Property(e => e.IconName)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("icon_name");
+            entity.Property(e => e.ItemType)
+                .HasMaxLength(10)
+                .IsUnicode(false)
+                .HasDefaultValue("item")
+                .HasColumnName("item_type");
+            entity.Property(e => e.Label)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("label");
+            entity.Property(e => e.Ordering).HasColumnName("ordering");
+            entity.Property(e => e.ParentId).HasColumnName("parent_id");
+            entity.Property(e => e.Path)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasColumnName("path");
+            entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
+
+            entity.HasOne(d => d.Parent).WithMany(p => p.InverseParent)
+                .HasForeignKey(d => d.ParentId)
+                .HasConstraintName("fk_portal_items_parent");
+
+            entity.HasOne(d => d.Workspace).WithMany(p => p.PortalItems)
+                .HasForeignKey(d => d.WorkspaceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_portal_items_workspace");
+        });
+
         modelBuilder.Entity<PortalMenu>(entity =>
         {
             entity.ToTable("PortalMenu");
@@ -1121,6 +1172,94 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(4)
                 .HasDefaultValue("")
                 .HasColumnName("zOrder");
+        });
+
+        modelBuilder.Entity<PortalRoute>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__portal_r__3213E83FD4F9FA7A");
+
+            entity.ToTable("portal_routes");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ComponentName)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("component_name");
+            entity.Property(e => e.IsPrivate)
+                .HasDefaultValue(true)
+                .HasColumnName("is_private");
+            entity.Property(e => e.Ordering).HasColumnName("ordering");
+            entity.Property(e => e.ParentId).HasColumnName("parent_id");
+            entity.Property(e => e.Path)
+                .HasMaxLength(255)
+                .IsUnicode(false)
+                .HasColumnName("path");
+
+            entity.HasOne(d => d.Parent).WithMany(p => p.InverseParent)
+                .HasForeignKey(d => d.ParentId)
+                .HasConstraintName("fk_portal_routes_parent");
+        });
+
+        modelBuilder.Entity<PortalUserConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__portal_u__3213E83F03E71F86");
+
+            entity.ToTable("portal_user_config");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Config).HasColumnName("config");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.PortalUserConfigs)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_portal_user_config_user");
+
+            entity.HasOne(d => d.Workspace).WithMany(p => p.PortalUserConfigs)
+                .HasForeignKey(d => d.WorkspaceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_portal_user_config_workspace");
+        });
+
+        modelBuilder.Entity<PortalUserFavorite>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__portal_u__3213E83F5D5147B8");
+
+            entity.ToTable("portal_user_favorites");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ItemId).HasColumnName("item_id");
+            entity.Property(e => e.Ordering).HasColumnName("ordering");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.HasOne(d => d.Item).WithMany(p => p.PortalUserFavorites)
+                .HasForeignKey(d => d.ItemId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_portal_user_favorites_item");
+
+            entity.HasOne(d => d.User).WithMany(p => p.PortalUserFavorites)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_portal_user_favorites_user");
+        });
+
+        modelBuilder.Entity<PortalWorkspace>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__portal_w__3213E83F8C231517");
+
+            entity.ToTable("portal_workspaces");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .IsUnicode(false)
+                .HasColumnName("name");
         });
 
         modelBuilder.Entity<QtQuote>(entity =>
