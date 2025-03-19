@@ -109,4 +109,8 @@ public partial class User
     public string? MobilePhone { get; set; }
 
     public string? DirectPhone { get; set; }
+
+    public virtual ICollection<PortalUserConfig> PortalUserConfigs { get; set; } = new List<PortalUserConfig>();
+
+    public virtual ICollection<PortalUserFavorite> PortalUserFavorites { get; set; } = new List<PortalUserFavorite>();
 }
