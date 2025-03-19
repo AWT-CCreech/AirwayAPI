@@ -128,7 +128,7 @@ namespace AirwayAPI.Controllers.MassMailerControllers
                 }
             }
 
-            // Depending on your routing preferences you might adjust the action name.
+            // Depending on routing preferences might adjust the action name.
             return CreatedAtAction("GetMassMailHistories", new { id = massMailHistory.Id }, massMailHistory);
         }
 
