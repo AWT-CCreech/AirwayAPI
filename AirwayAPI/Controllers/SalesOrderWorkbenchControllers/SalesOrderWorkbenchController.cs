@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AirwayAPI.Services.Interfaces;
-using AirwayAPI.Models.DTOs;
+using AirwayAPI.Models.SalesOrderWorkbenchModels;
 
 namespace AirwayAPI.Controllers.SalesOrderWorkbenchControllers
 {
