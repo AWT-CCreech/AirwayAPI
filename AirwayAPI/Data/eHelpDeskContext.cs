@@ -68,6 +68,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<QtSalesOrderDetail> QtSalesOrderDetails { get; set; }
 
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<RequestEvent> RequestEvents { get; set; }
 
     public virtual DbSet<RequestPo> RequestPos { get; set; }
@@ -1614,6 +1616,19 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.UpdatedByAutoSo)
                 .HasDefaultValue(false)
                 .HasColumnName("UpdatedByAutoSO");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__RefreshT__3214EC07F8EC3E63");
+
+            entity.HasIndex(e => e.Username, "IX_RefreshTokens_Username");
+
+            entity.HasIndex(e => e.Token, "UQ__RefreshT__1EB4F8172904FC20").IsUnique();
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Token).HasMaxLength(200);
+            entity.Property(e => e.Username).HasMaxLength(100);
         });
 
         modelBuilder.Entity<RequestEvent>(entity =>
