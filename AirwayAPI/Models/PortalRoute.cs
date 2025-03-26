@@ -17,7 +17,7 @@ public partial class PortalRoute
 
     public int Ordering { get; set; }
 
-    public virtual ICollection<PortalRoute> InverseParent { get; set; } = [];
+    public virtual ICollection<PortalRoute> InverseParent { get; set; } = new List<PortalRoute>();
 
     public virtual PortalRoute? Parent { get; set; }
 }
