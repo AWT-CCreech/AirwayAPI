@@ -23,11 +23,11 @@ public partial class PortalItem
 
     public int ColumnGroup { get; set; }
 
-    public virtual ICollection<PortalItem> InverseParent { get; set; } = [];
+    public virtual ICollection<PortalItem> InverseParent { get; set; } = new List<PortalItem>();
 
     public virtual PortalItem? Parent { get; set; }
 
-    public virtual ICollection<PortalUserFavorite> PortalUserFavorites { get; set; } = [];
+    public virtual ICollection<PortalUserFavorite> PortalUserFavorites { get; set; } = new List<PortalUserFavorite>();
 
     public virtual PortalWorkspace Workspace { get; set; } = null!;
 }
