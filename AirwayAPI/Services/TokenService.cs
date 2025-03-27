@@ -1,133 +1,76 @@
-﻿using AirwayAPI.Services.Interfaces;
+﻿using AirwayAPI.Data;
+using AirwayAPI.Models;
+using AirwayAPI.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
-namespace AirwayAPI.Services
+namespace AirwayAPI.Services;
+
+public class TokenService : ITokenService
 {
-    public class TokenService(IConfiguration configuration, ILogger<TokenService> logger) : ITokenService
+    private readonly eHelpDeskContext _context;
+    private readonly IConfiguration _config;
+    private readonly ILogger<TokenService> _logger;
+
+    public TokenService(eHelpDeskContext context, IConfiguration config, ILogger<TokenService> logger)
     {
-        private readonly IConfiguration _configuration = configuration;
-        private readonly ILogger<TokenService> _logger = logger;
+        _context = context;
+        _config = config;
+        _logger = logger;
+    }
 
-        public string GenerateJwtToken(string username)
+    public string GenerateJwtToken(string username)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, username), new Claim(ClaimTypes.Name, username) };
+        var token = new JwtSecurityToken(
+            issuer: _config["Jwt:Issuer"], audience: _config["Jwt:Audience"], claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public async Task<string> GenerateRefreshTokenAsync(string username)
+    {
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        _context.RefreshTokens.Add(new RefreshToken
         {
-            _logger.LogInformation("Generating new JWT token for user: {UserName}", username);
+            Token = token,
+            Username = username,
+            ExpiresAt = DateTime.UtcNow.AddDays(14)
+        });
+        await _context.SaveChangesAsync();
+        return token;
+    }
 
-            var jwtKey = _configuration["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey))
-            {
-                _logger.LogError("JWT Key is not configured in appsettings.json.");
-                throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
-            }
+    public async Task<bool> ValidateRefreshTokenAsync(string token) =>
+        await _context.RefreshTokens.AnyAsync(rt => rt.Token == token && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow);
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    public async Task RevokeRefreshTokenAsync(string token)
+    {
+        var rt = await _context.RefreshTokens.SingleOrDefaultAsync(x => x.Token == token);
+        if (rt != null) { rt.IsRevoked = true; await _context.SaveChangesAsync(); }
+    }
 
-            var claims = new List<Claim>
-            {
-                new(JwtRegisteredClaimNames.Sub, username), // 'sub' claim
-                new(ClaimTypes.NameIdentifier, username),
-                new(ClaimTypes.Email, $"{username}@airway.com"),
-                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(30),
-                signingCredentials: creds);
-
-            _logger.LogInformation("JWT token successfully generated for user: {UserName}", username);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+    public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+        var validationParams = new TokenValidationParameters
         {
-            _logger.LogInformation("Validating expired token.");
-
-            try
-            {
-                var jwtKey = _configuration["Jwt:Key"];
-                if (string.IsNullOrEmpty(jwtKey))
-                {
-                    _logger.LogError("JWT Key is not configured in appsettings.json.");
-                    throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
-                }
-
-                _logger.LogInformation("Using key for validation.");
-
-                var tokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                    ValidateIssuer = true,
-                    ValidIssuer = _configuration["Jwt:Issuer"],
-                    ValidateAudience = true,
-                    ValidAudience = _configuration["Jwt:Audience"],
-                    ValidateLifetime = false, // Allows validation of expired tokens
-                    ClockSkew = TimeSpan.Zero
-                };
-
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-
-                if (securityToken is JwtSecurityToken jwtSecurityToken &&
-                    jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    // Extract claims manually
-                    var jwtToken = tokenHandler.ReadJwtToken(token);
-                    var claims = jwtToken.Claims.ToList();
-
-                    // Log all claims for debugging
-                    foreach (var claim in claims)
-                    {
-                        _logger.LogInformation("Claim Type: {Type}, Claim Value: {Value}", claim.Type, claim.Value);
-                    }
-
-                    // Manually find the 'sub' claim
-                    var subClaim = claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
-                    if (string.IsNullOrEmpty(subClaim))
-                    {
-                        _logger.LogWarning("Token does not contain a 'sub' claim or the claim is empty.");
-                        throw new SecurityTokenException("Token does not contain a valid user identity.");
-                    }
-
-                    _logger.LogInformation("Successfully extracted 'sub' claim: {Sub}", subClaim);
-
-                    // Create a new ClaimsIdentity with the correct claims
-                    var identity = new ClaimsIdentity(claims, "Jwt");
-
-                    // Add the Name claim manually if not present
-                    if (!claims.Any(c => c.Type == ClaimTypes.Name))
-                    {
-                        identity.AddClaim(new Claim(ClaimTypes.Name, subClaim));
-                    }
-
-                    return new ClaimsPrincipal(identity);
-                }
-
-                _logger.LogWarning("Token header or algorithm mismatch.");
-                throw new SecurityTokenException("Invalid token algorithm or header.");
-            }
-            catch (SecurityTokenExpiredException)
-            {
-                _logger.LogWarning("Token has expired.");
-                throw;
-            }
-            catch (SecurityTokenException ex)
-            {
-                _logger.LogWarning("Security token exception: {Message}", ex.Message);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error validating token.");
-                throw;
-            }
-        }
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = key,
+            ValidateIssuer = true,
+            ValidIssuer = _config["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = _config["Jwt:Audience"],
+            ValidateLifetime = false,
+            ClockSkew = TimeSpan.Zero
+        };
+        var handler = new JwtSecurityTokenHandler();
+        return handler.ValidateToken(token, validationParams, out _);
     }
 }
