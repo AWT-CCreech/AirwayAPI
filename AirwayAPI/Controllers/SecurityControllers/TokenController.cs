@@ -2,15 +2,13 @@
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AirwayAPI.Controllers;
+namespace AirwayAPI.Controllers.SecurityControllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TokenController : ControllerBase
+public class TokenController(ITokenService tokenService) : ControllerBase
 {
-    private readonly ITokenService _tokenService;
-
-    public TokenController(ITokenService tokenService) => _tokenService = tokenService;
+    private readonly ITokenService _tokenService = tokenService;
 
     [HttpPost("RefreshToken")]
     public async Task<IActionResult> Refresh(TokenRefreshRequest req)
