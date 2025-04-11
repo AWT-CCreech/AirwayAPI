@@ -8,18 +8,12 @@ namespace AirwayAPI.Controllers.SalesOrderWorkbenchControllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class SalesOrderWorkbenchController : ControllerBase
+    public class SalesOrderWorkbenchController(
+        ISalesOrderService workbenchService,
+        ILogger<SalesOrderWorkbenchController> logger) : ControllerBase
     {
-        private readonly ISalesOrderWorkbenchService _workbenchService;
-        private readonly ILogger<SalesOrderWorkbenchController> _logger;
-
-        public SalesOrderWorkbenchController(
-            ISalesOrderWorkbenchService workbenchService,
-            ILogger<SalesOrderWorkbenchController> logger)
-        {
-            _workbenchService = workbenchService;
-            _logger = logger;
-        }
+        private readonly ISalesOrderService _workbenchService = workbenchService;
+        private readonly ILogger<SalesOrderWorkbenchController> _logger = logger;
 
         #region 1) GET endpoints (Event-Level & Detail-Level)
 
