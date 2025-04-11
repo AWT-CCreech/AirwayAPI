@@ -78,6 +78,8 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<ScanHistory> ScanHistories { get; set; }
 
+    public virtual DbSet<ScanTestLab> ScanTestLabs { get; set; }
+
     public virtual DbSet<SellOpCompetitor> SellOpCompetitors { get; set; }
 
     public virtual DbSet<ShorelineUser> ShorelineUsers { get; set; }
@@ -1840,6 +1842,75 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false)
                 .HasDefaultValue("");
+        });
+
+        modelBuilder.Entity<ScanTestLab>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("scan_TestLab");
+
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.CreatedOn)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EditBy)
+                .HasMaxLength(21)
+                .IsUnicode(false);
+            entity.Property(e => e.EditDate).HasColumnType("datetime");
+            entity.Property(e => e.Fn).HasDefaultValue(true);
+            entity.Property(e => e.HeciCode)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.Notes)
+                .HasMaxLength(512)
+                .IsUnicode(false);
+            entity.Property(e => e.OrderType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.PartNo)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PartNo2)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.PartNoClean)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.RedTagAction)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasDefaultValue("TBD");
+            entity.Property(e => e.RedTagStatus)
+                .HasMaxLength(12)
+                .IsUnicode(false)
+                .HasDefaultValue("Open");
+            entity.Property(e => e.RowId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("rowID");
+            entity.Property(e => e.ScanDate).HasColumnType("datetime");
+            entity.Property(e => e.ScanHistId).HasColumnName("ScanHistID");
+            entity.Property(e => e.ScannerId)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasColumnName("ScannerID");
+            entity.Property(e => e.SerialNo)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.SerialNoB)
+                .HasMaxLength(128)
+                .IsUnicode(false);
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.TestResult)
+                .HasMaxLength(10)
+                .IsUnicode(false);
+            entity.Property(e => e.UserName)
+                .HasMaxLength(20)
+                .IsUnicode(false);
         });
 
         modelBuilder.Entity<SellOpCompetitor>(entity =>
