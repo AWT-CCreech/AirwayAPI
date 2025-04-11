@@ -3,18 +3,20 @@ using AirwayAPI.Services;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers().AddJsonOptions(options =>
+    // Alternatively, use null to keep PascalCase
+    // options.JsonSerializerOptions.PropertyNamingPolicy = null;
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-// Alternatively, use null to keep PascalCase
-// options.JsonSerializerOptions.PropertyNamingPolicy = null;
 );
 
 // Configure CORS to allow specific origins, methods, and headers
@@ -45,7 +47,8 @@ builder.Services.AddDbContext<MAS500AppContext>(options =>
 
 // Register services with their corresponding interfaces
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<ISalesOrderWorkbenchService, SalesOrderWorkbenchService>();
+builder.Services.AddScoped<IScanService, ScanService>();
+builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<IStringService, StringService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
