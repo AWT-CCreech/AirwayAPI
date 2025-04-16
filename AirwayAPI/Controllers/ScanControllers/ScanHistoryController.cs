@@ -1,9 +1,11 @@
 ﻿using AirwayAPI.Models.ScanHistoryModels;
 using AirwayAPI.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AirwayAPI.Controllers.ScanControllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ScanHistoryController(IScanService scanService, ILogger<ScanHistoryController> logger) : ControllerBase
