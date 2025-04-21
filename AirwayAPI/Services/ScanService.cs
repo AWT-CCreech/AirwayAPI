@@ -6,91 +6,69 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AirwayAPI.Services
 {
-    public class ScanService : IScanService
+    public class ScanService(eHelpDeskContext context, ILogger<ScanService> logger) : IScanService
     {
-        private readonly eHelpDeskContext _context;
-        private readonly ILogger<ScanService> _logger;
-
-        public ScanService(eHelpDeskContext context, ILogger<ScanService> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly eHelpDeskContext _context = context;
+        private readonly ILogger<ScanService> _logger = logger;
 
         public async Task<IEnumerable<ScanHistory>> SearchScanHistoryAsync(SearchScansDto dto)
         {
             try
             {
-                // Log incoming DTO
                 _logger.LogInformation("SearchScanHistoryAsync called with DTO: {@DTO}", dto);
 
                 var query = _context.ScanHistories.AsQueryable();
 
-                // Filter by date range.
+                // Date range
                 _logger.LogInformation("Filtering by date range: {Start} - {End}", dto.ScanDateRangeStart, dto.ScanDateRangeEnd);
-                query = query.Where(s => s.ScanDate >= dto.ScanDateRangeStart && s.ScanDate <= dto.ScanDateRangeEnd);
-                var countAfterDate = await query.CountAsync();
-                _logger.LogInformation("Count after date filtering: {Count}", countAfterDate);
+                query = query.Where(s =>
+                    s.ScanDate >= dto.ScanDateRangeStart &&
+                    s.ScanDate <= dto.ScanDateRangeEnd);
+                _logger.LogInformation("Count after date filtering: {Count}", await query.CountAsync());
 
-                // Additional filters.
-                if (!string.IsNullOrWhiteSpace(dto.SoNo))
-                {
-                    _logger.LogInformation("Filtering by SoNo: {SoNo}", dto.SoNo);
-                    query = query.Where(s => s.SoNo != null && s.SoNo.Contains(dto.SoNo));
-                    _logger.LogInformation("Count after SoNo filtering: {Count}", await query.CountAsync());
-                }
-                if (!string.IsNullOrWhiteSpace(dto.PoNo))
-                {
-                    _logger.LogInformation("Filtering by PoNo: {PoNo}", dto.PoNo);
-                    query = query.Where(s => s.PoNo != null && s.PoNo.Contains(dto.PoNo));
-                    _logger.LogInformation("Count after PoNo filtering: {Count}", await query.CountAsync());
-                }
-                if (!string.IsNullOrWhiteSpace(dto.Rmano))
-                {
-                    _logger.LogInformation("Filtering by Rmano: {Rmano}", dto.Rmano);
-                    query = query.Where(s => s.Rmano != null && s.Rmano.Contains(dto.Rmano));
-                    _logger.LogInformation("Count after Rmano filtering: {Count}", await query.CountAsync());
-                }
-                if (dto.RTVID.HasValue && dto.RTVID.Value > 0)
-                {
-                    _logger.LogInformation("Filtering by RTVID: {RTVID}", dto.RTVID.Value);
-                    query = query.Where(s => s.Rtvid == dto.RTVID.Value);
-                    _logger.LogInformation("Count after RTVID filtering: {Count}", await query.CountAsync());
-                }
+                // PartNo
                 if (!string.IsNullOrWhiteSpace(dto.PartNo))
                 {
                     _logger.LogInformation("Filtering by PartNo: {PartNo}", dto.PartNo);
                     query = query.Where(s => s.PartNo != null && s.PartNo.Contains(dto.PartNo));
                     _logger.LogInformation("Count after PartNo filtering: {Count}", await query.CountAsync());
                 }
+
+                // SerialNo + SNField
                 if (!string.IsNullOrWhiteSpace(dto.SerialNo))
                 {
                     _logger.LogInformation("Filtering by SerialNo ({SNField}): {SerialNo}", dto.SNField, dto.SerialNo);
-                    if (dto.SNField.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+                    query = dto.SNField switch
                     {
-                        query = query.Where(s =>
+                        "" => query.Where(s =>
                             (s.SerialNo != null && s.SerialNo.Contains(dto.SerialNo)) ||
                             (s.SerialNoB != null && s.SerialNoB.Contains(dto.SerialNo)) ||
-                            (s.HeciCode != null && s.HeciCode.Contains(dto.SerialNo)));
-                    }
-                    else if (dto.SNField.Equals("SerialNo", StringComparison.OrdinalIgnoreCase))
-                    {
-                        query = query.Where(s => s.SerialNo != null && s.SerialNo.Contains(dto.SerialNo));
-                    }
+                            (s.HeciCode != null && s.HeciCode.Contains(dto.SerialNo))),
+                        "HeciCode" => query.Where(s => s.HeciCode != null && s.HeciCode.Contains(dto.SerialNo)),
+                        "SerialNo" => query.Where(s => s.SerialNo != null && s.SerialNo.Contains(dto.SerialNo)),
+                        "SerialNoB" => query.Where(s => s.SerialNoB != null && s.SerialNoB.Contains(dto.SerialNo)),
+                        _ => query
+                    };
                     _logger.LogInformation("Count after SerialNo filtering: {Count}", await query.CountAsync());
                 }
+
+                // MNSCo
                 if (!string.IsNullOrWhiteSpace(dto.MNSCo))
                 {
                     _logger.LogInformation("Filtering by MNSCo: {MNSCo}", dto.MNSCo);
                     query = query.Where(s => s.MnsCompany == dto.MNSCo);
                     _logger.LogInformation("Count after MNSCo filtering: {Count}", await query.CountAsync());
                 }
+
+                // ScanUser
                 if (!string.IsNullOrWhiteSpace(dto.ScanUser))
                 {
                     _logger.LogInformation("Filtering by ScanUser: {ScanUser}", dto.ScanUser);
                     query = query.Where(s => s.UserName == dto.ScanUser);
                     _logger.LogInformation("Count after ScanUser filtering: {Count}", await query.CountAsync());
                 }
+
+                // OrderType
                 if (!string.IsNullOrWhiteSpace(dto.OrderType))
                 {
                     _logger.LogInformation("Filtering by OrderType: {OrderType}", dto.OrderType);
@@ -98,23 +76,44 @@ namespace AirwayAPI.Services
                     _logger.LogInformation("Count after OrderType filtering: {Count}", await query.CountAsync());
                 }
 
-                // Order by RowId (as in legacy: ORDER BY rowID)
-                query = query.OrderBy(s => s.RowId);
+                // Single OrderNum search (includes RTV/C)
+                if (!string.IsNullOrWhiteSpace(dto.OrderNum))
+                {
+                    _logger.LogInformation("Filtering by OrderNum '{OrderNum}' under OrderType '{OrderType}'",
+                        dto.OrderNum, dto.OrderType);
 
-                // Apply the limit so that only a fixed number of records are returned.
-                query = query.Take(dto.Limit);
+                    query = dto.OrderType switch
+                    {
+                        "SO" => query.Where(s => s.SoNo != null && s.SoNo.Contains(dto.OrderNum)),
+                        "PO" => query.Where(s => s.PoNo != null && s.PoNo.Contains(dto.OrderNum)),
+                        "RMA" => query.Where(s => s.Rmano != null && s.Rmano.Contains(dto.OrderNum)),
+                        "RTV/C" when int.TryParse(dto.OrderNum, out var rtvId)
+                               => query.Where(s => s.Rtvid == rtvId),
+                        "" or null
+                               => query.Where(s =>
+                                    (s.SoNo != null && s.SoNo.Contains(dto.OrderNum)) ||
+                                    (s.PoNo != null && s.PoNo.Contains(dto.OrderNum)) ||
+                                    (s.Rmano != null && s.Rmano.Contains(dto.OrderNum)) ||
+                                    EF.Functions.Like(s.Rtvid.ToString(), $"%{dto.OrderNum}%")
+                                  ),
+                        _ => query
+                    };
 
-                // Log the generated SQL query (requires EF Core 5+)
-                string sqlQuery = query.ToQueryString();
-                _logger.LogInformation("Generated SQL query: {SqlQuery}", sqlQuery);
+                    _logger.LogInformation("Count after OrderNum filtering: {Count}", await query.CountAsync());
+                }
 
+                // Order & limit
+                query = query.OrderByDescending(s => s.RowId)
+                             .Take(dto.Limit);
+
+                _logger.LogInformation("Generated SQL query: {Sql}", query.ToQueryString());
                 var results = await query.ToListAsync();
                 _logger.LogInformation("Returning {Count} records", results.Count);
                 return results;
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error searching scan history: {ErrorMessage}", ex.Message);
+                _logger.LogError("Error searching scan history: {Message}", ex.Message);
                 throw;
             }
         }
