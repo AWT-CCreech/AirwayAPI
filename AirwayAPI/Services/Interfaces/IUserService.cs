@@ -1,7 +1,5 @@
 ﻿using AirwayAPI.Models;
 using AirwayAPI.Models.MassMailerModels;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace AirwayAPI.Services.Interfaces
 {
@@ -16,5 +14,10 @@ namespace AirwayAPI.Services.Interfaces
         // Returns only active users (from GetActiveUsersAsync) who have sent at least one MassMailer,
         // projected into the MassMailerUser model.
         Task<IEnumerable<MassMailerUser>> GetMassMailerUsersAsync();
+
+        /// <summary>
+        /// Returns all active warehouse users (DeptID = 8) who have at least one scan.
+        /// </summary>
+        Task<IEnumerable<User>> GetScanUsersAsync();
     }
 }
