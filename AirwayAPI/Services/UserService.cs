@@ -76,6 +76,32 @@ namespace AirwayAPI.Services
             return filteredUsers;
         }
 
+        public async Task<IEnumerable<User>> GetScanUsersAsync()
+        {
+            var excluded = new[] { "testlab" };
+
+            // 1) database does only Active=1, DeptID=8 and join with ScanHistory
+            var dbList = await (
+                from u in _context.Users
+                join s in _context.ScanHistories
+                    on u.Uname!.Trim().ToLower() equals s.UserName!.Trim().ToLower()
+                where u.Active == 1
+                   && u.DeptId == 8
+                select u
+            )
+            .Distinct()
+            .OrderBy(u => u.Uname)
+            .ToListAsync();
+
+            // 2) in‐memory exclude the unwanted uname(s)
+            var result = dbList
+                .Where(u => !excluded.Contains(u.Uname!.Trim().ToLower()))
+                .ToList();
+
+            return result;
+        }
+
+
         // Leverages GetActiveUsersAsync to filter out only those users who have sent a MassMailer.
         // Projects the result into the MassMailerUser model.
         public async Task<IEnumerable<MassMailerUser>> GetMassMailerUsersAsync()
