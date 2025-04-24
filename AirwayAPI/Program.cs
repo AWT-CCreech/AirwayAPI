@@ -47,6 +47,7 @@ builder.Services.AddDbContext<MAS500AppContext>(options =>
 
 // Register services with their corresponding interfaces
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IPortalService, PortalService>();
 builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<IStringService, StringService>();
