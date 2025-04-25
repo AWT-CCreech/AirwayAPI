@@ -1,76 +1,144 @@
-﻿using AirwayAPI.Data;
+﻿using AirwayAPI.Configuration;
+using AirwayAPI.Data;
 using AirwayAPI.Models;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace AirwayAPI.Services;
-
-public class TokenService : ITokenService
+namespace AirwayAPI.Services
 {
-    private readonly eHelpDeskContext _context;
-    private readonly IConfiguration _config;
-    private readonly ILogger<TokenService> _logger;
-
-    public TokenService(eHelpDeskContext context, IConfiguration config, ILogger<TokenService> logger)
+    public class TokenService(
+        eHelpDeskContext context,
+        JwtSettings jwtSettings,
+        ILogger<TokenService> logger) : ITokenService
     {
-        _context = context;
-        _config = config;
-        _logger = logger;
-    }
+        private readonly eHelpDeskContext _context = context;
+        private readonly JwtSettings _jwt = jwtSettings;
+        private readonly ILogger<TokenService> _logger = logger;
 
-    public string GenerateJwtToken(string username)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, username), new Claim(ClaimTypes.Name, username) };
-        var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"], audience: _config["Jwt:Audience"], claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(30), signingCredentials: creds);
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    public async Task<string> GenerateRefreshTokenAsync(string username)
-    {
-        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-        _context.RefreshTokens.Add(new RefreshToken
+        public string GenerateJwtToken(string username)
         {
-            Token = token,
-            Username = username,
-            ExpiresAt = DateTime.UtcNow.AddDays(14)
-        });
-        await _context.SaveChangesAsync();
-        return token;
-    }
+            _logger.LogInformation("Generating JWT for user {Username}", username);
 
-    public async Task<bool> ValidateRefreshTokenAsync(string token) =>
-        await _context.RefreshTokens.AnyAsync(rt => rt.Token == token && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow);
+            try
+            {
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
+                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                var claims = new[]
+                {
+                    new Claim(JwtRegisteredClaimNames.Sub, username),
+                    new Claim(ClaimTypes.Name, username)
+                };
 
-    public async Task RevokeRefreshTokenAsync(string token)
-    {
-        var rt = await _context.RefreshTokens.SingleOrDefaultAsync(x => x.Token == token);
-        if (rt != null) { rt.IsRevoked = true; await _context.SaveChangesAsync(); }
-    }
+                var token = new JwtSecurityToken(
+                    issuer: _jwt.Issuer,
+                    audience: _jwt.Audience,
+                    claims: claims,
+                    expires: DateTime.UtcNow.AddMinutes(_jwt.TokenLifetimeMinutes),
+                    signingCredentials: creds
+                );
 
-    public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-        var validationParams = new TokenValidationParameters
+                var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+                _logger.LogInformation("JWT generated successfully for user {Username}", username);
+                return jwt;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating JWT for user {Username}", username);
+                throw;
+            }
+        }
+
+        public async Task<string> GenerateRefreshTokenAsync(string username)
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = key,
-            ValidateIssuer = true,
-            ValidIssuer = _config["Jwt:Issuer"],
-            ValidateAudience = true,
-            ValidAudience = _config["Jwt:Audience"],
-            ValidateLifetime = false,
-            ClockSkew = TimeSpan.Zero
-        };
-        var handler = new JwtSecurityTokenHandler();
-        return handler.ValidateToken(token, validationParams, out _);
+            _logger.LogInformation("Generating refresh token for user {Username}", username);
+
+            try
+            {
+                var refreshTokenValue = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+                var refreshToken = new RefreshToken
+                {
+                    Token = refreshTokenValue,
+                    Username = username,
+                    ExpiresAt = DateTime.UtcNow.AddDays(_jwt.RefreshLifetimeDays)
+                };
+
+                _context.RefreshTokens.Add(refreshToken);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Refresh token persisted for user {Username}", username);
+                return refreshTokenValue;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating refresh token for user {Username}", username);
+                throw;
+            }
+        }
+
+        public async Task<bool> ValidateRefreshTokenAsync(string token)
+        {
+            _logger.LogDebug("Validating refresh token");
+            var valid = await _context.RefreshTokens.AnyAsync(rt =>
+                rt.Token == token &&
+                !rt.IsRevoked &&
+                rt.ExpiresAt > DateTime.UtcNow);
+
+            _logger.LogDebug("Refresh token validation result: {IsValid}", valid);
+            return valid;
+        }
+
+        public async Task RevokeRefreshTokenAsync(string token)
+        {
+            _logger.LogInformation("Revoking refresh token");
+            var rt = await _context.RefreshTokens.SingleOrDefaultAsync(x => x.Token == token);
+            if (rt != null)
+            {
+                rt.IsRevoked = true;
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Refresh token revoked successfully");
+            }
+            else
+            {
+                _logger.LogWarning("Attempted to revoke non-existent or already revoked token");
+            }
+        }
+
+        public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
+        {
+            _logger.LogDebug("Extracting principal from expired token");
+            try
+            {
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Key));
+                var validationParams = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateIssuer = true,
+                    ValidIssuer = _jwt.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = _jwt.Audience,
+                    ValidateLifetime = false,
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                var handler = new JwtSecurityTokenHandler();
+                var principal = handler.ValidateToken(token, validationParams, out _);
+                _logger.LogDebug("Principal extracted successfully");
+                return principal;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to extract principal from expired token");
+                throw;
+            }
+        }
     }
 }

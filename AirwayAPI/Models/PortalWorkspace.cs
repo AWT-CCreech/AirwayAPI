@@ -11,7 +11,7 @@ public partial class PortalWorkspace
 
     public string? Description { get; set; }
 
-    public virtual ICollection<PortalItem> PortalItems { get; set; } = new List<PortalItem>();
+    public virtual ICollection<PortalItem> PortalItems { get; set; } = [];
 
-    public virtual ICollection<PortalUserConfig> PortalUserConfigs { get; set; } = new List<PortalUserConfig>();
+    public virtual ICollection<PortalUserConfig> PortalUserConfigs { get; set; } = [];
 }

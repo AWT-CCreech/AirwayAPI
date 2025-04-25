@@ -1,73 +1,74 @@
+using AirwayAPI.Configuration;
 using AirwayAPI.Data;
 using AirwayAPI.Services;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllers().AddJsonOptions(options =>
-    // Alternatively, use null to keep PascalCase
-    // options.JsonSerializerOptions.PropertyNamingPolicy = null;
-    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+// 1) Bind and validate JwtSettings
+var jwtConfigSection = builder.Configuration.GetSection("Jwt");
+builder.Services.Configure<JwtSettings>(jwtConfigSection);
+
+var jwtSettings = jwtConfigSection.Get<JwtSettings>()
+    ?? throw new InvalidOperationException("Missing [Jwt] section in configuration.");
+
+if (string.IsNullOrWhiteSpace(jwtSettings.Key))
+    throw new InvalidOperationException("JwtSettings: Key must be set in configuration.");
+if (string.IsNullOrWhiteSpace(jwtSettings.Issuer))
+    throw new InvalidOperationException("JwtSettings: Issuer must be set in configuration.");
+if (string.IsNullOrWhiteSpace(jwtSettings.Audience))
+    throw new InvalidOperationException("JwtSettings: Audience must be set in configuration.");
+
+// Register the validated instance
+builder.Services.AddSingleton(jwtSettings);
+
+// 2) Add EF Core DbContexts
+builder.Services.AddDbContext<eHelpDeskContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("eHelpDeskConnection"))
+);
+builder.Services.AddDbContext<MAS500AppContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MAS500AppConnection"))
 );
 
-// Configure CORS to allow specific origins, methods, and headers
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy",
-        policy =>
-        {
-            policy.AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8");
-        });
-});
-
-// Registering the DbContext with dependency injection as Scoped (default)
-// eHelpDeskContext from the eHelpDesk database
-builder.Services.AddDbContext<eHelpDeskContext>(options =>
-{
-    options.UseSqlServer(builder.Configuration.GetConnectionString("eHelpDeskConnection"));
-});
-
-// REGISTER THE SECOND DB CONTEXT
-// MAS500AppContext from the mas500_app database (scaffolded with tarInvoice table)
-builder.Services.AddDbContext<MAS500AppContext>(options =>
-{
-    options.UseSqlServer(builder.Configuration.GetConnectionString("MAS500AppConnection"));
-});
-
-// Register services with their corresponding interfaces
+// 3) Register your application services
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IPortalService, PortalService>();
 builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<IStringService, StringService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
-
-// Register IHttpContextAccessor to access HttpContext from service classes
 builder.Services.AddHttpContextAccessor();
 
-// Configure JWT authentication
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-var keyString = jwtSettings["Key"];
+// 4) Controllers + JSON options
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 
-if (string.IsNullOrEmpty(keyString))
+// 5) CORS
+builder.Services.AddCors(opts =>
 {
-    throw new InvalidOperationException("JWT Key is not configured in appsettings.json.");
-}
+    opts.AddPolicy("CorsPolicy", policy =>
+    {
+        policy.AllowAnyHeader()
+              .AllowAnyMethod()
+              .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8");
+    });
+});
 
-var key = Encoding.ASCII.GetBytes(keyString);
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+// 6) JWT Authentication
+var keyBytes = Encoding.UTF8.GetBytes(jwtSettings.Key);
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -76,50 +77,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings["Issuer"],
-            ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+            ClockSkew = TimeSpan.Zero
         };
 
-        // Configure JwtBearer events
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
             {
-                // Log the authentication failure
-                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogError(context.Exception, "Authentication failed.");
-
-                // Do not modify the response here to prevent response already started issues
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILogger<Program>>();
+                logger.LogError(context.Exception, "JWT authentication failed");
                 return Task.CompletedTask;
             },
             OnChallenge = context =>
             {
-                // Override the default challenge response
                 context.HandleResponse();
-
-                // Check if the response has already started
                 if (!context.Response.HasStarted)
                 {
                     context.Response.StatusCode = 401;
                     context.Response.ContentType = "application/json";
+                    var payload = JsonSerializer.Serialize(
+                        new { message = "Authentication failed." });
 
-                    var result = JsonSerializer.Serialize(new { message = "Authentication failed." });
-                    return context.Response.WriteAsync(result);
+                    return context.Response.WriteAsync(payload);
                 }
-
-                // If the response has already started, do not attempt to modify it
                 return Task.CompletedTask;
             },
-            OnTokenValidated = context =>
-            {
-                // Optional: Additional token validation or logging
-                return Task.CompletedTask;
-            }
+            OnTokenValidated = context => Task.CompletedTask
         };
     });
 
-// Configure Swagger/OpenAPI
+// 7) Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -131,7 +122,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Use the Bearer scheme to authenticate requests with a JSON Web Token (JWT). Provide the token in the Authorization header with the format: 'Bearer {token}'."
+        Description = "Enter 'Bearer {token}'"
     });
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -141,7 +132,7 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    Id   = "Bearer"
                 }
             },
             Array.Empty<string>()
@@ -151,7 +142,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// 8) Middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -163,23 +154,19 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Uncomment the following line if you want to enforce HTTPS
+// Optional—enforce HTTPS
 // app.UseHttpsRedirection();
 
-// Serve static files from wwwroot
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
-
 app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Fallback to serve index.html for client-side routing
 app.MapFallbackToFile("/index.html");
-
 app.MapControllers();
 
 app.Run();
