@@ -26,11 +26,9 @@ namespace AirwayAPI.Services
 
                 // PartNo
                 if (!string.IsNullOrWhiteSpace(dto.PartNo))
-                {
                     query = query.Where(s =>
                         s.PartNo != null &&
                         s.PartNo.Contains(dto.PartNo));
-                }
 
                 // SerialNo + SNField
                 if (!string.IsNullOrWhiteSpace(dto.SerialNo))
@@ -47,25 +45,21 @@ namespace AirwayAPI.Services
                                 (s.SerialNoB != null && s.SerialNoB.Contains(dto.SerialNo)) ||
                                 (s.HeciCode != null && s.HeciCode.Contains(dto.SerialNo)));
                             break;
-
                         case "SerialNo":
                             query = query.Where(s =>
                                 s.SerialNo != null &&
                                 s.SerialNo.Contains(dto.SerialNo));
                             break;
-
                         case "SerialNoB":
                             query = query.Where(s =>
                                 s.SerialNoB != null &&
                                 s.SerialNoB.Contains(dto.SerialNo));
                             break;
-
                         case "HeciCode":
                             query = query.Where(s =>
                                 s.HeciCode != null &&
                                 s.HeciCode.Contains(dto.SerialNo));
                             break;
-
                         default:
                             // unknown SNField → no filter
                             break;
@@ -74,21 +68,15 @@ namespace AirwayAPI.Services
 
                 // MNSCo
                 if (!string.IsNullOrWhiteSpace(dto.MNSCo))
-                {
                     query = query.Where(s => s.MnsCompany == dto.MNSCo);
-                }
 
                 // ScanUser
                 if (!string.IsNullOrWhiteSpace(dto.ScanUser))
-                {
                     query = query.Where(s => s.UserName == dto.ScanUser);
-                }
 
                 // OrderType
                 if (!string.IsNullOrWhiteSpace(dto.OrderType))
-                {
                     query = query.Where(s => s.OrderType == dto.OrderType);
-                }
 
                 // OrderNum
                 if (!string.IsNullOrWhiteSpace(dto.OrderNum))
@@ -96,19 +84,13 @@ namespace AirwayAPI.Services
                     switch (dto.OrderType)
                     {
                         case "SO":
-                            query = query.Where(s =>
-                                s.SoNo != null &&
-                                s.SoNo.Contains(dto.OrderNum));
+                            query = query.Where(s => s.SoNo != null && s.SoNo.Contains(dto.OrderNum));
                             break;
                         case "PO":
-                            query = query.Where(s =>
-                                s.PoNo != null &&
-                                s.PoNo.Contains(dto.OrderNum));
+                            query = query.Where(s => s.PoNo != null && s.PoNo.Contains(dto.OrderNum));
                             break;
                         case "RMA":
-                            query = query.Where(s =>
-                                s.Rmano != null &&
-                                s.Rmano.Contains(dto.OrderNum));
+                            query = query.Where(s => s.Rmano != null && s.Rmano.Contains(dto.OrderNum));
                             break;
                         case "RTV/C":
                             if (int.TryParse(dto.OrderNum, out var rtvId))
@@ -165,58 +147,81 @@ namespace AirwayAPI.Services
 
         public async Task<int> UpdateScansAsync(IEnumerable<UpdateScanDto> updateDtos)
         {
-            var updateCount = 0;
-            _logger.LogInformation("UpdateScansAsync called with DTOs: {@DTOs}", updateDtos);
+            var toApply = updateDtos
+                .Where(dto =>
+                    dto.ScanDate.HasValue ||
+                    !string.IsNullOrWhiteSpace(dto.UserName) ||
+                    !string.IsNullOrWhiteSpace(dto.OrderType) ||
+                    !string.IsNullOrWhiteSpace(dto.OrderNum) ||
+                    !string.IsNullOrWhiteSpace(dto.PartNo) ||
+                    !string.IsNullOrWhiteSpace(dto.SerialNo) ||
+                    !string.IsNullOrWhiteSpace(dto.HeciCode))
+                .ToList();
 
-            foreach (var dto in updateDtos)
+            if (toApply.Count == 0)
+            {
+                _logger.LogInformation("UpdateScansAsync: no meaningful updates, skipping");
+                return 0;
+            }
+
+            _logger.LogInformation("UpdateScansAsync called with {Count} DTOs", toApply.Count);
+            var updatedCount = 0;
+
+            foreach (var dto in toApply)
             {
                 try
                 {
                     var scan = await _context.ScanHistories
                         .FirstOrDefaultAsync(s => s.RowId == dto.RowId);
-
                     if (scan == null)
                     {
-                        _logger.LogWarning("ScanRowId {RowId} not found", dto.RowId);
+                        _logger.LogWarning("RowId {RowId} not found", dto.RowId);
                         continue;
                     }
 
-                    if (dto.ScanDate.HasValue)
-                        scan.ScanDate = dto.ScanDate.Value;
-
-                    if (!string.IsNullOrWhiteSpace(dto.UserName))
-                        scan.UserName = dto.UserName;
-
+                    // 1) Apply OrderType if present
                     if (!string.IsNullOrWhiteSpace(dto.OrderType))
                     {
                         scan.OrderType = dto.OrderType;
-                        switch (dto.OrderType)
-                        {
-                            case "SO" when !string.IsNullOrWhiteSpace(dto.OrderNum):
-                                scan.SoNo = dto.OrderNum;
-                                break;
-                            case "PO" when !string.IsNullOrWhiteSpace(dto.OrderNum):
-                                scan.PoNo = dto.OrderNum;
-                                break;
-                            case "RMA" when !string.IsNullOrWhiteSpace(dto.OrderNum):
-                                scan.Rmano = dto.OrderNum;
-                                break;
-                            case "RTV/C" when int.TryParse(dto.OrderNum, out var id):
-                                scan.Rtvid = id;
-                                break;
-                        }
+                        _logger.LogInformation("Row {RowId}: set OrderType = {Type}", dto.RowId, dto.OrderType);
                     }
 
+                    // 2) Apply OrderNum if present, based on scan.OrderType
+                    if (!string.IsNullOrWhiteSpace(dto.OrderNum))
+                    {
+                        switch (scan.OrderType)
+                        {
+                            case "SO":
+                                scan.SoNo = dto.OrderNum;
+                                break;
+                            case "PO":
+                                scan.PoNo = dto.OrderNum;
+                                break;
+                            case "RMA":
+                                scan.Rmano = dto.OrderNum;
+                                break;
+                            case "RTV/C":
+                                if (int.TryParse(dto.OrderNum, out var id))
+                                    scan.Rtvid = id;
+                                break;
+                        }
+                        _logger.LogInformation("Row {RowId}: set OrderNum = {Num} on type {Type}",
+                            dto.RowId, dto.OrderNum, scan.OrderType);
+                    }
+
+                    // 3) The others exactly as before:
+                    if (dto.ScanDate.HasValue)
+                        scan.ScanDate = dto.ScanDate.Value;
+                    if (!string.IsNullOrWhiteSpace(dto.UserName))
+                        scan.UserName = dto.UserName;
                     if (!string.IsNullOrWhiteSpace(dto.PartNo))
                         scan.PartNo = dto.PartNo;
-
                     if (!string.IsNullOrWhiteSpace(dto.SerialNo))
                         scan.SerialNo = dto.SerialNo;
-
                     if (!string.IsNullOrWhiteSpace(dto.HeciCode))
                         scan.HeciCode = dto.HeciCode;
 
-                    updateCount++;
+                    updatedCount++;
                 }
                 catch (Exception ex)
                 {
@@ -225,8 +230,8 @@ namespace AirwayAPI.Services
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("UpdateScansAsync updated {Count} records", updateCount);
-            return updateCount;
+            _logger.LogInformation("UpdateScansAsync persisted {Count} records", updatedCount);
+            return updatedCount;
         }
 
         public async Task<int> AddTestLabScansAsync(IEnumerable<int> selectedIds)
@@ -347,7 +352,7 @@ namespace AirwayAPI.Services
                 }
             }
 
-            // Stored procedure for MNS transactions if needed
+            // Optionally run stored procedure
             if ((copyRequest.FromCompany != "AirWay") &&
                 (copyRequest.ToCompany == "AirWay" || copyRequest.ToCompany != "AirWay"))
             {
