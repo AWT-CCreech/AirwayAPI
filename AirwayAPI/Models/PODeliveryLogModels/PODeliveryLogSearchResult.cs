@@ -1,4 +1,5 @@
-﻿using AirwayAPI.Models;
+﻿namespace AirwayAPI.Models.PODeliveryLogModels;
+
 public class PODeliveryLogSearchResult
 {
     public int Id { get; set; }
@@ -8,7 +9,7 @@ public class PODeliveryLogSearchResult
     public int? QtyOrdered { get; set; }
     public int? QtyReceived { get; set; }
     public int? ReceiverNum { get; set; }
-    public bool NotesExist { get; set; } 
+    public bool NotesExist { get; set; }
     public string? NoteEditDate { get; set; }
     public DateTime? PORequiredDate { get; set; }
     public DateTime? DateDelivered { get; set; }

@@ -1,10 +1,9 @@
-﻿namespace AirwayAPI.Models.DailyGoalsModels
+﻿namespace AirwayAPI.Models.DailyGoalsModels;
+
+public class DailyGoalTotals
 {
-    public class DailyGoalTotals
-    {
-        public decimal TotalSold { get; set; }
-        public decimal TotalShipped { get; set; }
-        public decimal TotalBackOrder { get; set; }
-        public decimal SoBatchTotal { get; set; }
-    }
+    public decimal TotalSold { get; set; }
+    public decimal TotalShipped { get; set; }
+    public decimal TotalBackOrder { get; set; }
+    public decimal SoBatchTotal { get; set; }
 }

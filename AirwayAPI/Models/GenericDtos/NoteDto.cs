@@ -1,8 +1,7 @@
-﻿namespace AirwayAPI.Models.GenericDtos
+﻿namespace AirwayAPI.Models.GenericDtos;
+
+public class NoteDto
 {
-    public class NoteDto
-    {
-        public required string Note { get; set; }
-        public required string EnteredBy { get; set; }
-    }
+    public required string Note { get; set; }
+    public required string EnteredBy { get; set; }
 }

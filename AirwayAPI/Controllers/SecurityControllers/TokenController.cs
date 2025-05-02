@@ -1,7 +1,6 @@
 ﻿using AirwayAPI.Models.SecurityModels;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace AirwayAPI.Controllers.SecurityControllers
 {

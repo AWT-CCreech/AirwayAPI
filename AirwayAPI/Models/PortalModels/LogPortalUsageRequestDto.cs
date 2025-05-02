@@ -1,8 +1,7 @@
-﻿namespace AirwayAPI.Models.PortalModels
+﻿namespace AirwayAPI.Models.PortalModels;
+
+public class LogPortalUsageRequestDto
 {
-    public class LogPortalUsageRequestDto
-    {
-        public string Url { get; set; }
-        public string Username { get; set; }
-    }
+    public string Url { get; set; }
+    public string Username { get; set; }
 }

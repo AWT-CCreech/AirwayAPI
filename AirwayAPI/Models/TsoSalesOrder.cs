@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace AirwayAPI.Models;
+﻿namespace AirwayAPI.Models;
 
 public partial class TsoSalesOrder
 {

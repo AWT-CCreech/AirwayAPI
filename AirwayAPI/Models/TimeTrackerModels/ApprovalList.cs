@@ -1,8 +1,7 @@
-﻿namespace AirwayAPI.Models.TimeTrackerModels
+﻿namespace AirwayAPI.Models.TimeTrackerModels;
+
+public class ApprovalList
 {
-    public class ApprovalList
-    {
-        public int[] UserIds { get; set; }
-        public bool[] PreviousPeriods { get; set; }
-    }
+    public int[] UserIds { get; set; }
+    public bool[] PreviousPeriods { get; set; }
 }

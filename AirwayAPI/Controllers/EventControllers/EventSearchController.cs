@@ -1,5 +1,5 @@
 ﻿using AirwayAPI.Data;
-using AirwayAPI.Models.EquipmentRequestModels;
+using AirwayAPI.Models.EventSearchModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

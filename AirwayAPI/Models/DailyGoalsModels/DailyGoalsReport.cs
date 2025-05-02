@@ -1,8 +1,7 @@
-﻿namespace AirwayAPI.Models.DailyGoalsModels
+﻿namespace AirwayAPI.Models.DailyGoalsModels;
+
+public class DailyGoalsReport
 {
-    public class DailyGoalsReport
-    {
-        public List<DailyGoalItem> Items { get; set; }
-        public DailyGoalTotals Totals { get; set; }
-    }
+    public List<DailyGoalItem> Items { get; set; }
+    public DailyGoalTotals Totals { get; set; }
 }
