@@ -89,12 +89,7 @@ namespace AirwayAPI.Services
                 .ToListAsync();
         }
 
-        private List<PortalMenuItemDto> BuildMenuTree(
-            List<PortalItem> items,
-            int? parentId,
-            List<int> favoriteIds)
-        {
-            return items
+        private static List<PortalMenuItemDto> BuildMenuTree(List<PortalItem> items, int? parentId, List<int> favoriteIds) => [.. items
                 .Where(i => i.ParentId == parentId)
                 .OrderBy(i => i.Ordering)
                 .Select(i => new PortalMenuItemDto
@@ -108,8 +103,6 @@ namespace AirwayAPI.Services
                     ColumnGroup = i.ColumnGroup,
                     IsFavorite = favoriteIds.Contains(i.Id),
                     Children = BuildMenuTree(items, i.Id, favoriteIds)
-                })
-                .ToList();
-        }
+                })];
     }
 }
