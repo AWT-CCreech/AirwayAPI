@@ -37,7 +37,9 @@ builder.Services.AddDbContext<MAS500AppContext>(options =>
 );
 
 // 3) Register your application services
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IPortalService, PortalService>();
 builder.Services.AddScoped<IPurchasingService, PurchasingService>();
 builder.Services.AddScoped<IScanService, ScanService>();
