@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿namespace AirwayAPI.Assets;
 
-namespace AirwayAPI.Assets
+public static class Email
 {
-    public static class Email
-    {
-        public static string EmailTemplate = @"
+    public static string EmailTemplate = @"
             <html xmlns:v=""urn:schemas-microsoft-com:vml"" xmlns:o=""urn:schemas-microsoft-com:office:office"" xmlns:w=""urn:schemas-microsoft-com:office:word"" xmlns:m=""http://schemas.microsoft.com/office/2004/12/omml"" xmlns=""http://www.w3.org/TR/REC-html40"">
             <head>
                 <META HTTP-EQUIV=""Content-Type"" CONTENT=""text/html; charset=us-ascii"">
@@ -109,5 +104,4 @@ namespace AirwayAPI.Assets
             </html>
             ";
 
-    }
 }

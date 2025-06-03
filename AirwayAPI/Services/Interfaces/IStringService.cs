@@ -1,7 +1,6 @@
-﻿namespace AirwayAPI.Services.Interfaces
+﻿namespace AirwayAPI.Services.Interfaces;
+
+public interface IStringService
 {
-    public interface IStringService
-    {
-        string ReplaceDelimiters(string input);
-    }
+    string ReplaceDelimiters(string input);
 }

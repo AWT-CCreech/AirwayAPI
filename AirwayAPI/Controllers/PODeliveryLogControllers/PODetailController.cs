@@ -4,59 +4,58 @@ using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AirwayAPI.Controllers.PODeliveryLogControllers
+namespace AirwayAPI.Controllers.PODeliveryLogControllers;
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
+public class PODetailController(IPurchasingService purchasingService) : ControllerBase
 {
-    [Authorize]
-    [ApiController]
-    [Route("api/[controller]")]
-    public class PODetailController(IPurchasingService purchasingService) : ControllerBase
+    private readonly IPurchasingService _purchasingService = purchasingService;
+
+    [HttpGet("id/{id}")]
+    public async Task<IActionResult> GetPODetailByID(int id)
     {
-        private readonly IPurchasingService _purchasingService = purchasingService;
-
-        [HttpGet("id/{id}")]
-        public async Task<IActionResult> GetPODetailByID(int id)
+        try
         {
-            try
-            {
-                var dto = await _purchasingService.GetPODetailByIdAsync(id);
-                return Ok(dto);
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
+            var dto = await _purchasingService.GetPODetailByIdAsync(id);
+            return Ok(dto);
         }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdatePODetail(int id, [FromBody] PODetailUpdateDto updateDto)
+        catch (KeyNotFoundException)
         {
-            try
-            {
-                await _purchasingService.UpdatePODetailAsync(id, updateDto);
-                return NoContent();
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            return NotFound();
         }
+    }
 
-        [HttpPut("{id}/note")]
-        public async Task<IActionResult> AddNoteToPODetail(int id, [FromBody] NoteDto noteDto)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdatePODetail(int id, [FromBody] PODetailUpdateDto updateDto)
+    {
+        try
         {
-            try
-            {
-                await _purchasingService.AddNoteAsync(id, noteDto);
-                return NoContent();
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
+            await _purchasingService.UpdatePODetailAsync(id, updateDto);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPut("{id}/note")]
+    public async Task<IActionResult> AddNoteToPODetail(int id, [FromBody] NoteDto noteDto)
+    {
+        try
+        {
+            await _purchasingService.AddNoteAsync(id, noteDto);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
     }
 }

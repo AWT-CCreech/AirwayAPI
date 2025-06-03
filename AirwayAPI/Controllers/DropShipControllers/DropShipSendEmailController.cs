@@ -9,102 +9,102 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 
-namespace AirwayAPI.Controllers.DropShipControllers
+namespace AirwayAPI.Controllers.DropShipControllers;
+
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
+public class DropShipSendEmailController(eHelpDeskContext context) : ControllerBase
 {
-    [Authorize]
-    [ApiController]
-    [Route("api/[controller]")]
-    public class DropShipSendEmailController(eHelpDeskContext context) : ControllerBase
+    private readonly eHelpDeskContext _context = context;
+
+    [HttpPost]
+    public async Task<ActionResult> DropShipSendEmailAsync([FromBody] DropShipEmailInput input)
     {
-        private readonly eHelpDeskContext _context = context;
-
-        [HttpPost]
-        public async Task<ActionResult> DropShipSendEmailAsync([FromBody] DropShipEmailInput input)
+        if (input == null || string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrWhiteSpace(input.Password) ||
+            input.ToEmails == null || input.RecipientNames == null)
         {
-            if (input == null || string.IsNullOrWhiteSpace(input.UserName) || string.IsNullOrWhiteSpace(input.Password) ||
-                input.ToEmails == null || input.RecipientNames == null)
-            {
-                return BadRequest("Invalid input.");
-            }
+            return BadRequest("Invalid input.");
+        }
 
-            try
+        try
+        {
+            using (var client = new SmtpClient())
             {
-                using (var client = new SmtpClient())
+                await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
+                if (input.UserName.Trim().ToLower() == "lvonderporten")
                 {
-                    await client.ConnectAsync("smtp.office365.com", 587, SecureSocketOptions.StartTls);
-                    if (input.UserName.Trim().ToLower() == "lvonderporten")
-                    {
-                        await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.DecryptPassword(input.Password));
-                    }
-                    else
-                    {
-                        await client.AuthenticateAsync(input.UserName.Trim().ToLower() + "@airway.com", LoginUtils.DecryptPassword(input.Password));
-                    }
+                    await client.AuthenticateAsync("lvonder@airway.com", LoginUtils.DecryptPassword(input.Password));
+                }
+                else
+                {
+                    await client.AuthenticateAsync(input.UserName.Trim().ToLower() + "@airway.com", LoginUtils.DecryptPassword(input.Password));
+                }
 
-                    User? senderInfo;
-                    if (input.UserName.Trim().ToLower() == "lvonder")
-                    {
-                        senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
-                            .FirstOrDefaultAsync();
-                    }
-                    else
-                    {
-                        senderInfo = await _context.Users
-                            .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.UserName.Trim().ToLower())
-                            .FirstOrDefaultAsync();
-                    }
+                User? senderInfo;
+                if (input.UserName.Trim().ToLower() == "lvonder")
+                {
+                    senderInfo = await _context.Users
+                        .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == "lvonderporten")
+                        .FirstOrDefaultAsync();
+                }
+                else
+                {
+                    senderInfo = await _context.Users
+                        .Where(user => user.Uname != null && user.Uname.Trim().ToLower() == input.UserName.Trim().ToLower())
+                        .FirstOrDefaultAsync();
+                }
 
-                    if (senderInfo == null)
+                if (senderInfo == null)
+                {
+                    return NotFound("Sender user not found.");
+                }
+
+                string senderFullname = senderInfo.Fname + " " + senderInfo.Lname;
+                if (input.UserName.Trim().ToLower() == "lvonderporten")
+                {
+                    senderFullname = "Linda Von der Porten";
+                }
+
+                var message = new MimeMessage();
+
+                // Sender profile
+                message.From.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
+
+                // Check if running on localhost:5001
+                bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost" && HttpContext.Request.Host.Port == 5001;
+
+                if (isLocalhost)
+                {
+                    // Only send to current user
+                    message.To.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
+                }
+                else
+                {
+                    // Add all recipients
+                    for (int i = 0; i < input.ToEmails.Count; ++i)
                     {
-                        return NotFound("Sender user not found.");
-                    }
-
-                    string senderFullname = senderInfo.Fname + " " + senderInfo.Lname;
-                    if (input.UserName.Trim().ToLower() == "lvonderporten")
-                    {
-                        senderFullname = "Linda Von der Porten";
-                    }
-
-                    var message = new MimeMessage();
-
-                    // Sender profile
-                    message.From.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
-
-                    // Check if running on localhost:5001
-                    bool isLocalhost = HttpContext.Request.Host.Host.ToLower() == "localhost" && HttpContext.Request.Host.Port == 5001;
-
-                    if (isLocalhost)
-                    {
-                        // Only send to current user
-                        message.To.Add(new MailboxAddress(senderFullname, input.UserName.Trim().ToLower() == "lvonderporten" ? "lvonder@airway.com" : input.UserName.Trim().ToLower() + "@airway.com"));
-                    }
-                    else
-                    {
-                        // Add all recipients
-                        for (int i = 0; i < input.ToEmails.Count; ++i)
+                        if (!string.IsNullOrWhiteSpace(input.ToEmails[i]) && !string.IsNullOrWhiteSpace(input.RecipientNames[i]))
                         {
-                            if (!string.IsNullOrWhiteSpace(input.ToEmails[i]) && !string.IsNullOrWhiteSpace(input.RecipientNames[i]))
-                            {
-                                message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.ToEmails[i].Trim()));
-                            }
+                            message.To.Add(new MailboxAddress(input.RecipientNames[i].Trim(), input.ToEmails[i].Trim()));
                         }
-                        message.To.Add(new MailboxAddress("AirWay Accounts Payable", "airwayap@airway.com"));
-                        message.To.Add(new MailboxAddress("Receiving", "Receiving@airway.com"));
-                        message.To.Add(new MailboxAddress("Shipping Team", "ShippingTeam@airway.com"));
-                        message.To.Add(new MailboxAddress("Purch_Dept", "Purch_Dept@airway.com"));
-
-                        // CC to Ben for now
-                        message.Cc.Add(new MailboxAddress("Ben Bleser", "bbleser@airway.com"));
                     }
+                    message.To.Add(new MailboxAddress("AirWay Accounts Payable", "airwayap@airway.com"));
+                    message.To.Add(new MailboxAddress("Receiving", "Receiving@airway.com"));
+                    message.To.Add(new MailboxAddress("Shipping Team", "ShippingTeam@airway.com"));
+                    message.To.Add(new MailboxAddress("Purch_Dept", "Purch_Dept@airway.com"));
 
-                    // Set email subject
-                    message.Subject = input.Subject;
+                    // CC to Ben for now
+                    message.Cc.Add(new MailboxAddress("Ben Bleser", "bbleser@airway.com"));
+                }
 
-                    // Create the email body with styling
-                    var bodyBuilder = new BodyBuilder
-                    {
-                        HtmlBody = $@"
+                // Set email subject
+                message.Subject = input.Subject;
+
+                // Create the email body with styling
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
                             <html>
                             <head>
                                 <style>
@@ -161,22 +161,21 @@ namespace AirwayAPI.Controllers.DropShipControllers
                                 </div>
                             </body>
                             </html>"
-                    };
-                    message.Body = bodyBuilder.ToMessageBody();
+                };
+                message.Body = bodyBuilder.ToMessageBody();
 
-                    // Send email
-                    await client.SendAsync(message);
+                // Send email
+                await client.SendAsync(message);
 
-                    // Close connection after the email is sent
-                    await client.DisconnectAsync(true);
-                }
-
-                return Ok();
+                // Close connection after the email is sent
+                await client.DisconnectAsync(true);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message + " ......... " + ex.StackTrace);
-            }
+
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message + " ......... " + ex.StackTrace);
         }
     }
 }
