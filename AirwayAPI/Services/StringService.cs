@@ -20,10 +20,7 @@ public partial class StringService : IStringService
         string replaced = DelimiterRegex().Replace(input.Trim(), ",");
 
         // Remove a leading comma if it exists
-        if (replaced.StartsWith(','))
-        {
-            replaced = replaced[1..];
-        }
+        replaced = replaced.Trim(',');
 
         return replaced;
     }
