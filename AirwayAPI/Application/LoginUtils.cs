@@ -5,8 +5,11 @@ namespace AirwayAPI.Application;
 
 public static class LoginUtils
 {
-    // It's highly recommended to retrieve the EncryptionKey from a secure configuration source
-    private static readonly string EncryptionKey = "ASDASWEF453123234"; // Replace with secure retrieval
+    // Encryption key is provided at runtime via Program.cs
+    private static string? _encryptionKey;
+
+    public static void SetEncryptionKey(string key)
+        => _encryptionKey = key;
 
     // Define constants for PBKDF2
     private const int Iterations = 100_000; // Recommended minimum
@@ -53,8 +56,11 @@ public static class LoginUtils
             rng.GetBytes(salt);
         }
 
-        // Derive Key and IV from the EncryptionKey and salt
-        using (var pdb = new Rfc2898DeriveBytes(EncryptionKey, salt, Iterations, HashAlgorithm))
+        if (string.IsNullOrWhiteSpace(_encryptionKey))
+            throw new InvalidOperationException("Encryption key is not configured.");
+
+        // Derive Key and IV from the configured key and salt
+        using (var pdb = new Rfc2898DeriveBytes(_encryptionKey, salt, Iterations, HashAlgorithm))
         {
             encryptor.Key = pdb.GetBytes(KeySize);    // 256-bit key for AES-256
             encryptor.IV = pdb.GetBytes(16);         // 128-bit IV for AES
@@ -110,8 +116,11 @@ public static class LoginUtils
             Buffer.BlockCopy(cipherBytesWithSalt, SaltSize, cipherBytes, 0, cipherTextLength);
 
             using Aes encryptor = Aes.Create();
-            // Derive Key and IV from the EncryptionKey and extracted salt
-            using (var pdb = new Rfc2898DeriveBytes(EncryptionKey, salt, Iterations, HashAlgorithm))
+            if (string.IsNullOrWhiteSpace(_encryptionKey))
+                throw new InvalidOperationException("Encryption key is not configured.");
+
+            // Derive Key and IV from the configured key and extracted salt
+            using (var pdb = new Rfc2898DeriveBytes(_encryptionKey, salt, Iterations, HashAlgorithm))
             {
                 encryptor.Key = pdb.GetBytes(KeySize);    // 256-bit key for AES-256
                 encryptor.IV = pdb.GetBytes(16);         // 128-bit IV for AES

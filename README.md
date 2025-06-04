@@ -43,6 +43,10 @@ AirwayAPI is the main API utilized by the `awt-portal-app`, an internal portal a
 
 ## Configuration
 - Update the appsettings.json file to configure the application settings such as the database connection string.
+- Set the encryption key for password encryption via the `Security:EncryptionKey` setting. In production this can be supplied through an environment variable:
+  ```sh
+  export Security__EncryptionKey="your_secret_key"
+  ```
 
 ## Contributing
 - Contributions are welcome! Please open an issue or submit a pull request for any changes or improvements.

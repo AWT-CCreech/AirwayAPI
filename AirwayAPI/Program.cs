@@ -1,6 +1,7 @@
 using AirwayAPI.Configuration;
 using AirwayAPI.Data;
 using AirwayAPI.Services;
+using AirwayAPI.Application;
 using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,19 @@ if (string.IsNullOrWhiteSpace(jwtSettings.Audience))
 
 // Register the validated instance
 builder.Services.AddSingleton(jwtSettings);
+// 1b) Bind and validate SecuritySettings
+var securityConfigSection = builder.Configuration.GetSection("Security");
+builder.Services.Configure<SecuritySettings>(securityConfigSection);
+
+var securitySettings = securityConfigSection.Get<SecuritySettings>()
+    ?? throw new InvalidOperationException("Missing [Security] section in configuration.");
+
+if (string.IsNullOrWhiteSpace(securitySettings.EncryptionKey))
+    throw new InvalidOperationException("Security: EncryptionKey must be set in configuration.");
+
+builder.Services.AddSingleton(securitySettings);
+LoginUtils.SetEncryptionKey(securitySettings.EncryptionKey);
+
 
 // 2) Add EF Core DbContexts
 builder.Services.AddDbContext<eHelpDeskContext>(options =>
@@ -157,7 +171,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Optional—enforce HTTPS
+// Optionalâ€”enforce HTTPS
 // app.UseHttpsRedirection();
 
 app.UseDefaultFiles();
