@@ -1,3 +1,4 @@
+using AirwayAPI.Application;
 using AirwayAPI.Configuration;
 using AirwayAPI.Data;
 using AirwayAPI.Services;
@@ -10,14 +11,11 @@ using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // 1) Bind and validate JwtSettings
 var jwtConfigSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtSettings>(jwtConfigSection);
-
 var jwtSettings = jwtConfigSection.Get<JwtSettings>()
     ?? throw new InvalidOperationException("Missing [Jwt] section in configuration.");
-
 if (string.IsNullOrWhiteSpace(jwtSettings.Key))
     throw new InvalidOperationException("JwtSettings: Key must be set in configuration.");
 if (string.IsNullOrWhiteSpace(jwtSettings.Issuer))
@@ -25,8 +23,21 @@ if (string.IsNullOrWhiteSpace(jwtSettings.Issuer))
 if (string.IsNullOrWhiteSpace(jwtSettings.Audience))
     throw new InvalidOperationException("JwtSettings: Audience must be set in configuration.");
 
-// Register the validated instance
+// 1a) Register the validated instance
 builder.Services.AddSingleton(jwtSettings);
+// 1b) Bind and validate SecuritySettings
+var securityConfigSection = builder.Configuration.GetSection("Security");
+builder.Services.Configure<SecuritySettings>(securityConfigSection);
+
+var securitySettings = securityConfigSection.Get<SecuritySettings>()
+    ?? throw new InvalidOperationException("Missing [Security] section in configuration.");
+
+if (string.IsNullOrWhiteSpace(securitySettings.EncryptionKey))
+    throw new InvalidOperationException("Security: EncryptionKey must be set in configuration.");
+
+builder.Services.AddSingleton(securitySettings);
+LoginUtils.SetEncryptionKey(securitySettings.EncryptionKey);
+
 
 // 2) Add EF Core DbContexts
 builder.Services.AddDbContext<eHelpDeskContext>(options =>
@@ -35,7 +46,6 @@ builder.Services.AddDbContext<eHelpDeskContext>(options =>
 builder.Services.AddDbContext<MAS500AppContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MAS500AppConnection"))
 );
-
 // 3) Register your application services
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -48,7 +58,6 @@ builder.Services.AddScoped<IStringService, StringService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddHttpContextAccessor();
-
 // 4) Controllers + JSON options
 builder.Services
     .AddControllers()
@@ -56,7 +65,6 @@ builder.Services
     {
         opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
-
 // 5) CORS
 builder.Services.AddCors(opts =>
 {
@@ -67,7 +75,6 @@ builder.Services.AddCors(opts =>
               .WithOrigins("http://localhost:3000", "http://localhost:5001", "http://10.0.0.8");
     });
 });
-
 // 6) JWT Authentication
 var keyBytes = Encoding.UTF8.GetBytes(jwtSettings.Key);
 builder.Services
@@ -85,7 +92,6 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
             ClockSkew = TimeSpan.Zero
         };
-
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
@@ -104,7 +110,6 @@ builder.Services
                     context.Response.ContentType = "application/json";
                     var payload = JsonSerializer.Serialize(
                         new { message = "Authentication failed." });
-
                     return context.Response.WriteAsync(payload);
                 }
                 return Task.CompletedTask;
@@ -112,7 +117,6 @@ builder.Services
             OnTokenValidated = context => Task.CompletedTask
         };
     });
-
 // 7) Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -142,9 +146,7 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-
 var app = builder.Build();
-
 // 8) Middleware pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -162,14 +164,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
-
 app.UseRouting();
 app.UseCors("CorsPolicy");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapFallbackToFile("/index.html");
 app.MapControllers();
-
 app.Run();
