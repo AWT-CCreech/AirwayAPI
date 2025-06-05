@@ -36,9 +36,9 @@ public partial class eHelpDeskContext : DbContext
 
     public virtual DbSet<EquipmentSnapshot> EquipmentSnapshots { get; set; }
 
-    public virtual DbSet<MassMailHistory> MassMailHistories { get; set; }
+    public virtual DbSet<FreightQuote> FreightQuotes { get; set; }
 
-    public virtual DbSet<MassMailer> MassMailers { get; set; }
+    public virtual DbSet<FreightSo> FreightSos { get; set; }
 
     public virtual DbSet<MasterSearchQuery> MasterSearchQueries { get; set; }
 
@@ -79,6 +79,8 @@ public partial class eHelpDeskContext : DbContext
     public virtual DbSet<ScanTestLab> ScanTestLabs { get; set; }
 
     public virtual DbSet<SellOpCompetitor> SellOpCompetitors { get; set; }
+
+    public virtual DbSet<ShipmentWorkbench> ShipmentWorkbenches { get; set; }
 
     public virtual DbSet<ShorelineUser> ShorelineUsers { get; set; }
 
@@ -929,54 +931,200 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnType("datetime");
         });
 
-        modelBuilder.Entity<MassMailHistory>(entity =>
+        modelBuilder.Entity<FreightQuote>(entity =>
         {
-            entity.ToTable("MassMailHistory");
+            entity.ToTable("FreightQuote");
 
-            entity.HasIndex(e => new { e.MassMailId, e.CompanyName }, "IX_MassMailHistory_MailID_CoName").HasFillFactor(80);
-
-            entity.HasIndex(e => e.MassMailId, "IX_MassMailHistory_MailID_w_CoName_ConName").HasFillFactor(80);
-
-            entity.Property(e => e.AltPartNum)
+            entity.Property(e => e.ActualWeight).HasDefaultValue(0);
+            entity.Property(e => e.AirwayPo)
+                .HasMaxLength(50)
+                .HasDefaultValue("")
+                .HasColumnName("AirwayPO");
+            entity.Property(e => e.BillOfLading)
+                .HasMaxLength(150)
+                .HasDefaultValue("");
+            entity.Property(e => e.BoxTotal).HasDefaultValue(0);
+            entity.Property(e => e.Cancelled).HasDefaultValue(false);
+            entity.Property(e => e.CarrierUsed)
                 .HasMaxLength(50)
                 .HasDefaultValue("");
-            entity.Property(e => e.CompanyName).HasMaxLength(50);
-            entity.Property(e => e.ContactName)
+            entity.Property(e => e.CommercialTerms)
                 .HasMaxLength(50)
                 .HasDefaultValue("");
-            entity.Property(e => e.DateSent)
+            entity.Property(e => e.Crating)
+                .HasMaxLength(10)
+                .HasDefaultValue("");
+            entity.Property(e => e.EnteredBy)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.EntryDate)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
-            entity.Property(e => e.MassMailId)
+            entity.Property(e => e.EventId)
                 .HasDefaultValue(0)
-                .HasColumnName("MassMailID");
-            entity.Property(e => e.PartDesc)
-                .HasMaxLength(125)
+                .HasColumnName("EventID");
+            entity.Property(e => e.Fqdeadline)
+                .HasDefaultValueSql("(((1)/(1))/(1900))")
+                .HasColumnType("datetime")
+                .HasColumnName("FQDeadline");
+            entity.Property(e => e.FreightChangeNpu)
+                .HasDefaultValue(false)
+                .HasColumnName("FreightChangeNPU");
+            entity.Property(e => e.FreightSheet).HasDefaultValue(false);
+            entity.Property(e => e.HelpRequested).HasDefaultValue(false);
+            entity.Property(e => e.InOutBound).HasDefaultValue(false);
+            entity.Property(e => e.LiftGate)
+                .HasMaxLength(10)
                 .HasDefaultValue("");
-            entity.Property(e => e.PartNum)
+            entity.Property(e => e.LoadingDock).HasDefaultValue(false);
+            entity.Property(e => e.ModifiedBy)
                 .HasMaxLength(50)
                 .HasDefaultValue("");
-            entity.Property(e => e.Qty).HasDefaultValue(0);
-            entity.Property(e => e.RequestId)
+            entity.Property(e => e.ModifiedDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Notes)
+                .HasDefaultValue("")
+                .HasColumnType("text");
+            entity.Property(e => e.Priced).HasDefaultValue(false);
+            entity.Property(e => e.QuoteId)
                 .HasDefaultValue(0)
-                .HasColumnName("RequestID");
-            entity.Property(e => e.RespondedTo).HasDefaultValue(false);
+                .HasColumnName("QuoteID");
+            entity.Property(e => e.ReasonCancelled)
+                .HasMaxLength(200)
+                .HasDefaultValue("");
+            entity.Property(e => e.ServiceUsed)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipDate)
+                .HasDefaultValueSql("(((1)/(1))/(1900))")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ShipFrom)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromAddress1)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromAddress2)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromAddress3)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromAddress4)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromContact)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromNum)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipFromPhone)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipInfoModBy)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipInfoModDate)
+                .HasDefaultValueSql("(((1)/(1))/(1900))")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ShipRep)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipTo)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToAddress1)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToAddress2)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToAddress3)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToAddress4)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToContact)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToNum)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipToPhone)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipmentNotes)
+                .HasMaxLength(255)
+                .HasDefaultValue("");
+            entity.Property(e => e.ShipmentValue)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.Straps)
+                .HasMaxLength(10)
+                .HasDefaultValue("");
+            entity.Property(e => e.TotalPieces).HasDefaultValue(0);
+            entity.Property(e => e.TrackNum)
+                .HasMaxLength(255)
+                .HasDefaultValue("");
+            entity.Property(e => e.TypeOfService)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.TypeOfService2)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.TypeOfService3)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.VendorContact)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
+            entity.Property(e => e.VendorPhone)
+                .HasMaxLength(25)
+                .HasDefaultValue("");
         });
 
-        modelBuilder.Entity<MassMailer>(entity =>
+        modelBuilder.Entity<FreightSo>(entity =>
         {
-            entity.HasKey(e => e.MassMailId);
+            entity.ToTable("FreightSO");
 
-            entity.ToTable("MassMailer");
+            entity.HasIndex(e => e.FreightQuoteId, "IX_FreightSO_FreightQuoteID").HasFillFactor(80);
 
-            entity.Property(e => e.MassMailId).HasColumnName("MassMailID");
-            entity.Property(e => e.DateSent)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnType("datetime");
-            entity.Property(e => e.MassMailDesc)
+            entity.Property(e => e.DeliveredDate).HasColumnType("datetime");
+            entity.Property(e => e.DeliveryNote).HasMaxLength(255);
+            entity.Property(e => e.EnteredBy)
                 .HasMaxLength(50)
                 .HasDefaultValue("");
-            entity.Property(e => e.SentBy).HasDefaultValue(38);
+            entity.Property(e => e.EntryDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Eta)
+                .HasColumnType("datetime")
+                .HasColumnName("ETA");
+            entity.Property(e => e.FreightCharge)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.FreightQuoteId).HasDefaultValue(0);
+            entity.Property(e => e.Markup)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.ModifiedBy)
+                .HasMaxLength(50)
+                .HasDefaultValue("");
+            entity.Property(e => e.ModifiedDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.PackageHandling)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.Sonum)
+                .HasDefaultValue(0)
+                .HasColumnName("SONum");
+            entity.Property(e => e.TotalFreight)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
         });
 
         modelBuilder.Entity<MasterSearchQuery>(entity =>
@@ -1070,6 +1218,10 @@ public partial class eHelpDeskContext : DbContext
             entity.Property(e => e.SalesRep)
                 .HasMaxLength(25)
                 .HasDefaultValue("");
+            entity.Property(e => e.ShipToNo).HasMaxLength(50);
+            entity.Property(e => e.Sokey)
+                .HasDefaultValue(0)
+                .HasColumnName("SOKey");
             entity.Property(e => e.Sonum)
                 .HasMaxLength(10)
                 .HasColumnName("SONum");
@@ -1925,6 +2077,42 @@ public partial class eHelpDeskContext : DbContext
                 .HasColumnName("EventID");
         });
 
+        modelBuilder.Entity<ShipmentWorkbench>(entity =>
+        {
+            entity.HasKey(e => e.RowId);
+
+            entity.ToTable("Shipment_Workbench");
+
+            entity.Property(e => e.RowId).HasColumnName("rowID");
+            entity.Property(e => e.Carrier).HasMaxLength(25);
+            entity.Property(e => e.DeliverTo).HasMaxLength(150);
+            entity.Property(e => e.DeliveryDate).HasColumnType("datetime");
+            entity.Property(e => e.EditBy).HasMaxLength(50);
+            entity.Property(e => e.EditDate).HasColumnType("datetime");
+            entity.Property(e => e.EnteredBy).HasMaxLength(50);
+            entity.Property(e => e.EntryDate)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.FqshipmentId)
+                .HasDefaultValue(0)
+                .HasColumnName("FQShipmentID");
+            entity.Property(e => e.FreightAmount)
+                .HasDefaultValue(0m)
+                .HasColumnType("money");
+            entity.Property(e => e.FreightIn).HasDefaultValue(false);
+            entity.Property(e => e.PickupFrom).HasMaxLength(75);
+            entity.Property(e => e.Ponum)
+                .HasMaxLength(50)
+                .HasColumnName("PONum");
+            entity.Property(e => e.Rep).HasMaxLength(50);
+            entity.Property(e => e.ShipStatus).HasMaxLength(25);
+            entity.Property(e => e.Sonum)
+                .HasMaxLength(50)
+                .HasColumnName("SONum");
+            entity.Property(e => e.TrackingNo).HasMaxLength(150);
+            entity.Property(e => e.Urgent).HasDefaultValue(0);
+        });
+
         modelBuilder.Entity<ShorelineUser>(entity =>
         {
             entity.HasNoKey();
@@ -2372,6 +2560,9 @@ public partial class eHelpDeskContext : DbContext
                 .HasMaxLength(25)
                 .HasColumnName("RMANum");
             entity.Property(e => e.ShipToNum).HasMaxLength(16);
+            entity.Property(e => e.Sokey)
+                .HasDefaultValue(0)
+                .HasColumnName("SOKey");
             entity.Property(e => e.Terms).HasMaxLength(25);
         });
 
