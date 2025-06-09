@@ -1,10 +1,15 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class OpenSoreport
 {
     public int Id { get; set; }
 
     public string? Sonum { get; set; }
+
+    public int? Sokey { get; set; }
 
     public string? CompanyId { get; set; }
 
@@ -27,6 +32,8 @@ public partial class OpenSoreport
     public int? QtyReceived { get; set; }
 
     public int? LeftToShip { get; set; }
+
+    public string? ShipToNo { get; set; }
 
     public int? OrgLeftToShip { get; set; }
 

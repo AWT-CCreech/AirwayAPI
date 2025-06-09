@@ -1,8 +1,13 @@
-﻿namespace AirwayAPI.Models;
+﻿using System;
+using System.Collections.Generic;
+
+namespace AirwayAPI.Models;
 
 public partial class TrkRwSoheader
 {
     public string? OrderNum { get; set; }
+
+    public int? Sokey { get; set; }
 
     public int? Type { get; set; }
 
