@@ -9,12 +9,20 @@ namespace AirwayAPI.Services
     /// <summary>
     /// Encapsulates all Freight_Sheet.asp logic (Save / Update / AddRow / Get).
     /// </summary>
-    public class LogisticsService(
-        eHelpDeskContext context
-        // IEmailSender emailSender
-        ) : ILogisticsService
+    public class LogisticsService : ILogisticsService
     {
-        private readonly eHelpDeskContext _context = context;
+        private readonly eHelpDeskContext _context;
+        // If you have an email‐sending abstraction, inject it here:
+        // private readonly IEmailSender _emailSender;
+
+        public LogisticsService(
+            eHelpDeskContext context
+        // IEmailSender emailSender
+        )
+        {
+            _context = context;
+            // _emailSender = emailSender;
+        }
 
         public async Task<int> CreateFreightQuoteAsync(FreightQuoteDto dto, string currentUserName)
         {
@@ -113,10 +121,7 @@ namespace AirwayAPI.Services
 
             // 1) Load existing FreightQuote
             var existingQuote = await _context.FreightQuotes
-                .FirstOrDefaultAsync(fq => fq.Id == dto.FreightQuoteId);
-
-            if (existingQuote == null)
-                throw new InvalidOperationException($"FreightQuote with Id={dto.FreightQuoteId} not found.");
+                .FirstOrDefaultAsync(fq => fq.Id == dto.FreightQuoteId) ?? throw new InvalidOperationException($"FreightQuote with Id={dto.FreightQuoteId} not found.");
 
             // 2) Update header fields
             existingQuote.ShipFrom = dto.ShipFrom;
