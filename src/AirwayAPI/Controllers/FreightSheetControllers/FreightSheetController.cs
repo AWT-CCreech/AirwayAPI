@@ -5,25 +5,18 @@ using AirwayAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AirwayAPI.Controllers
+namespace AirwayAPI.Controllers.FreightSheetControllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class FreightSheetController : ControllerBase
+    public class FreightSheetController(
+        ILogisticsService logisticsService,
+        IEmailService emailService,
+        IConfiguration configuration) : ControllerBase
     {
-        private readonly ILogisticsService _logisticsService;
-        private readonly IEmailService _emailService;
-        private readonly IConfiguration _configuration;
-
-        public FreightSheetController(
-            ILogisticsService logisticsService,
-            IEmailService emailService,
-            IConfiguration configuration)
-        {
-            _logisticsService = logisticsService;
-            _emailService = emailService;
-            _configuration = configuration;
-        }
+        private readonly ILogisticsService _logisticsService = logisticsService;
+        private readonly IEmailService _emailService = emailService;
+        private readonly IConfiguration _configuration = configuration;
 
         /// <summary>
         /// POST /api/FreightSheet/save
