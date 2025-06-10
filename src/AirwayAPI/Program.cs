@@ -50,6 +50,7 @@ builder.Services.AddDbContext<MAS500AppContext>(options =>
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
+builder.Services.AddScoped<ILogisticsService, LogisticsService>();
 builder.Services.AddScoped<IPortalService, PortalService>();
 builder.Services.AddScoped<IPurchasingService, PurchasingService>();
 builder.Services.AddScoped<IScanService, ScanService>();
