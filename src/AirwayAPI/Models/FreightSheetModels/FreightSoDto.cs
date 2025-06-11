@@ -4,7 +4,7 @@ namespace AirwayAPI.Models.FreightSheetModels
     /// <summary>
     /// Mirrors the ASP array fields: aryShipmentID, arySONum, aryFreightCharge, aryMU, aryPackageHandling, aryTotalFreight
     /// </summary>
-    public class FreightSoLineDto
+    public class FreightSoDto
     {
         /// <summary>
         /// When updating an existing line, Id>0. When adding a brand new row, Id==0.
