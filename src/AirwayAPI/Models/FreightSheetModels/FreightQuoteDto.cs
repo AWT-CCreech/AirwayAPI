@@ -45,6 +45,6 @@ namespace AirwayAPI.Models.FreightSheetModels
         /// A flat list of all the FreightSO line‐items.  When “AddRow” was clicked, ASP would render one more row,
         /// so we still get a FreightSolineDto for each row, some of which may have Id==0 (new insert).
         /// </summary>
-        public List<FreightSoLineDto> Lines { get; set; } = new();
+        public List<FreightSoDto> Lines { get; set; } = new();
     }
 }
