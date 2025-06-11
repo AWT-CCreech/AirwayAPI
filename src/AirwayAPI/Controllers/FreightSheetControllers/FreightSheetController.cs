@@ -152,7 +152,7 @@ namespace AirwayAPI.Controllers.FreightSheetControllers
                 return BadRequest("Invalid FreightQuoteId.");
 
             var currentUser = User.Identity?.Name ?? "system";
-            var newLineId = await _logisticsService.AddFreightSoLineAsync(freightQuoteId, currentUser);
+            var newLineId = await _logisticsService.AddFreightSoAsync(freightQuoteId, currentUser);
             return Ok(newLineId);
         }
 
@@ -182,7 +182,7 @@ namespace AirwayAPI.Controllers.FreightSheetControllers
             if (id <= 0)
                 return BadRequest("Invalid FreightQuoteId.");
 
-            var lines = await _logisticsService.GetFreightSoLinesByQuoteIdAsync(id);
+            var lines = await _logisticsService.GetFreightSoByQuoteIdAsync(id);
             return Ok(lines);
         }
     }
