@@ -211,7 +211,7 @@ namespace AirwayAPI.Services
             await _context.SaveChangesAsync();
         }
 
-        public async Task<int> AddFreightSoLineAsync(int freightQuoteId, string currentUserName)
+        public async Task<int> AddFreightSoAsync(int freightQuoteId, string currentUserName)
         {
             // Insert a blank/new FreightSo row (everything zeroed out)
             var newLine = new FreightSo
@@ -245,7 +245,7 @@ namespace AirwayAPI.Services
             return quote;
         }
 
-        public async Task<List<FreightSo>> GetFreightSoLinesByQuoteIdAsync(int freightQuoteId)
+        public async Task<List<FreightSo>> GetFreightSoByQuoteIdAsync(int freightQuoteId)
         {
             return await _context.FreightSos
                 .AsNoTracking()
