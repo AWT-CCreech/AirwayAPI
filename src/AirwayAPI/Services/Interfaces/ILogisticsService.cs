@@ -23,7 +23,7 @@ namespace AirwayAPI.Services.Interfaces
         /// Inserts one new FreightSO row (all-zero values) for an existing FreightQuote.Id.
         /// Mirrors frmAction="AddRow". Returns the newly‐created FreightSO.Id.
         /// </summary>
-        Task<int> AddFreightSoLineAsync(int freightQuoteId, string currentUserName);
+        Task<int> AddFreightSoAsync(int freightQuoteId, string currentUserName);
 
         /// <summary>
         /// Retrieves the FreightQuote header by Id.  (Used when loading an existing sheet.)
@@ -33,6 +33,6 @@ namespace AirwayAPI.Services.Interfaces
         /// <summary>
         /// Retrieves all FreightSO lines associated with a given FreightQuote.Id.
         /// </summary>
-        Task<List<FreightSo>> GetFreightSoLinesByQuoteIdAsync(int freightQuoteId);
+        Task<List<FreightSo>> GetFreightSoByQuoteIdAsync(int freightQuoteId);
     }
 }
